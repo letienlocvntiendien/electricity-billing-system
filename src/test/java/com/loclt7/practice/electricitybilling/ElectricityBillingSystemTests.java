@@ -1,10 +1,10 @@
-package com.loclt7.practice.ecommerece;
+package com.loclt7.practice.electricitybilling;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class EcommerceApplicationTests {
+class ElectricityBillingSystemTests {
 
     @Test
     void contextLoads() {

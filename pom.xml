@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.loclt7.practice</groupId>
-    <artifactId>ecommerece</artifactId>
+    <artifactId>electricity-billing-system</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>ecommerece</name>
-    <description>ecommerece</description>
+    <name>Electricity Billing System</name>
+    <description>Electricity Billing System</description>
     <url/>
     <licenses>
         <license/>
