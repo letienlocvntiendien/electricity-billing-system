@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)",
+      "Read(//mnt/c/Users/as/Development/back_end_projects/**)",
+      "Bash(./mvnw compile *)",
+      "Bash(./mvnw.cmd clean *)",
+      "Bash(./mvnw.cmd compile *)",
+      "Bash(./mvnw.cmd test *)"
+    ]
+  }
+}
