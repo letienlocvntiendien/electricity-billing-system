@@ -1,0 +1,631 @@
+{
+  "info": {
+    "name": "Finpen Electricity Billing API",
+    "_postman_id": "finpen-electricity-billing-v1",
+    "description": "Full test suite for the Electricity Billing System backend.\n\nSetup:\n1. Import this collection.\n2. Set the `baseUrl` variable (default: http://localhost:8080).\n3. Run **Auth / Login** first — it auto-saves the access & refresh tokens to collection variables.\n4. All other requests use `{{accessToken}}` automatically.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl",       "value": "http://localhost:8080", "type": "string" },
+    { "key": "accessToken",   "value": "", "type": "string" },
+    { "key": "refreshToken",  "value": "", "type": "string" },
+    { "key": "customerId",    "value": "1",  "type": "string" },
+    { "key": "periodId",      "value": "1",  "type": "string" },
+    { "key": "readingId",     "value": "1",  "type": "string" },
+    { "key": "invoiceId",     "value": "1",  "type": "string" },
+    { "key": "billId",        "value": "1",  "type": "string" },
+    { "key": "paymentId",     "value": "1",  "type": "string" },
+    { "key": "settingKey",    "value": "default_service_unit_price", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const res = pm.response.json();",
+                "if (res.data) {",
+                "  pm.collectionVariables.set('accessToken',  res.data.accessToken);",
+                "  pm.collectionVariables.set('refreshToken', res.data.refreshToken);",
+                "  console.log('Tokens saved.');",
+                "}",
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "pm.test('Has access token', () => pm.expect(res.data.accessToken).to.be.a('string'));"
+              ]
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"password\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api","auth","login"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "const res = pm.response.json();",
+                "if (res.data && res.data.accessToken) {",
+                "  pm.collectionVariables.set('accessToken', res.data.accessToken);",
+                "  console.log('Access token refreshed.');",
+                "}",
+                "pm.test('Status 200', () => pm.response.to.have.status(200));"
+              ]
+            }
+          }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/refresh", "host": ["{{baseUrl}}"], "path": ["api","auth","refresh"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api","auth","logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "List Customers",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has data', () => pm.expect(pm.response.json().data).to.exist);"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/customers?page=0&size=20&sort=code", "host": ["{{baseUrl}}"], "path": ["api","customers"], "query": [{"key":"page","value":"0"},{"key":"size","value":"20"},{"key":"sort","value":"code"}] }
+          }
+        },
+        {
+          "name": "List Active Customers",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/customers?active=true", "host": ["{{baseUrl}}"], "path": ["api","customers"], "query": [{"key":"active","value":"true"}] }
+          }
+        },
+        {
+          "name": "Get Customer",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/customers/{{customerId}}", "host": ["{{baseUrl}}"], "path": ["api","customers","{{customerId}}"] }
+          }
+        },
+        {
+          "name": "Create Customer",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const res = pm.response.json();",
+                "if (res.data) pm.collectionVariables.set('customerId', res.data.id);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"KH001\",\n  \"fullName\": \"Nguyễn Văn A\",\n  \"phone\": \"0901234567\",\n  \"zaloPhone\": \"0901234567\",\n  \"meterSerial\": \"MSN-0001\",\n  \"notes\": \"\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/customers", "host": ["{{baseUrl}}"], "path": ["api","customers"] }
+          }
+        },
+        {
+          "name": "Update Customer",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyễn Văn A (updated)\",\n  \"phone\": \"0909999999\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/customers/{{customerId}}", "host": ["{{baseUrl}}"], "path": ["api","customers","{{customerId}}"] }
+          }
+        },
+        {
+          "name": "Delete Customer (Soft)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/api/customers/{{customerId}}", "host": ["{{baseUrl}}"], "path": ["api","customers","{{customerId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Periods",
+      "item": [
+        {
+          "name": "List Periods",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods?page=0&size=10", "host": ["{{baseUrl}}"], "path": ["api","periods"], "query": [{"key":"page","value":"0"},{"key":"size","value":"10"}] }
+          }
+        },
+        {
+          "name": "Get Current Period",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods/current", "host": ["{{baseUrl}}"], "path": ["api","periods","current"] }
+          }
+        },
+        {
+          "name": "Get Period",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}"] }
+          }
+        },
+        {
+          "name": "Create Period",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const res = pm.response.json();",
+                "if (res.data) pm.collectionVariables.set('periodId', res.data.id);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tháng 5/2026\",\n  \"startDate\": \"2026-05-01\",\n  \"endDate\": \"2026-05-31\",\n  \"serviceUnitPrice\": 3000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/periods", "host": ["{{baseUrl}}"], "path": ["api","periods"] }
+          }
+        },
+        {
+          "name": "Update Period (extra fee)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"extraFee\": 50000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}"] }
+          }
+        },
+        {
+          "name": "Review Period",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has unitPrice preview', () => pm.expect(pm.response.json().data.previewUnitPrice).to.exist);"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/review", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","review"] }
+          }
+        },
+        {
+          "name": "Calculate Period",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Status is CALCULATED', () => pm.expect(pm.response.json().data.status).to.equal('CALCULATED'));"] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/calculate", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","calculate"] }
+          }
+        },
+        {
+          "name": "Approve Period (ADMIN)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Status is APPROVED', () => pm.expect(pm.response.json().data.status).to.equal('APPROVED'));"] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/approve", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","approve"] }
+          }
+        },
+        {
+          "name": "Revert Period (ADMIN)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Status is OPEN', () => pm.expect(pm.response.json().data.status).to.equal('OPEN'));"] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/revert", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","revert"] }
+          }
+        },
+        {
+          "name": "Close Period (ADMIN)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Status is CLOSED', () => pm.expect(pm.response.json().data.status).to.equal('CLOSED'));"] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/close", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","close"] }
+          }
+        },
+        {
+          "name": "Download Print-Pack PDF",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Is PDF', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf'));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/print-pack", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","print-pack"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "EVN Invoices",
+      "item": [
+        {
+          "name": "List EVN Invoices",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/evn-invoices", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","evn-invoices"] }
+          }
+        },
+        {
+          "name": "Create EVN Invoice",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const res = pm.response.json();",
+                "if (res.data) pm.collectionVariables.set('invoiceId', res.data.id);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoiceDate\": \"2026-05-10\",\n  \"invoiceNumber\": \"EVN-2026-05-001\",\n  \"kwh\": 4819,\n  \"amount\": 7546419,\n  \"attachmentUrl\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/evn-invoices", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","evn-invoices"] }
+          }
+        },
+        {
+          "name": "Get EVN Invoice",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/evn-invoices/{{invoiceId}}", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","evn-invoices","{{invoiceId}}"] }
+          }
+        },
+        {
+          "name": "Update EVN Invoice",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invoiceDate\": \"2026-05-10\",\n  \"invoiceNumber\": \"EVN-2026-05-001\",\n  \"kwh\": 4900,\n  \"amount\": 7700000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/evn-invoices/{{invoiceId}}", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","evn-invoices","{{invoiceId}}"] }
+          }
+        },
+        {
+          "name": "Delete EVN Invoice",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/evn-invoices/{{invoiceId}}", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","evn-invoices","{{invoiceId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Meter Readings",
+      "item": [
+        {
+          "name": "List Readings for Period",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const res = pm.response.json();",
+                "if (res.data && res.data.length > 0) {",
+                "  pm.collectionVariables.set('readingId', res.data[0].id);",
+                "  console.log('readingId set to', res.data[0].id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/periods/{{periodId}}/readings", "host": ["{{baseUrl}}"], "path": ["api","periods","{{periodId}}","readings"] }
+          }
+        },
+        {
+          "name": "Submit Meter Reading",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentIndex\": 1250\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/readings/{{readingId}}", "host": ["{{baseUrl}}"], "path": ["api","readings","{{readingId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bills",
+      "item": [
+        {
+          "name": "List Bills for Period",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const res = pm.response.json();",
+                "if (res.data && res.data.length > 0) {",
+                "  pm.collectionVariables.set('billId', res.data[0].id);",
+                "  console.log('billId set to', res.data[0].id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/bills?periodId={{periodId}}", "host": ["{{baseUrl}}"], "path": ["api","bills"], "query": [{"key":"periodId","value":"{{periodId}}"}] }
+          }
+        },
+        {
+          "name": "Get Bill",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/bills/{{billId}}", "host": ["{{baseUrl}}"], "path": ["api","bills","{{billId}}"] }
+          }
+        },
+        {
+          "name": "Mark Bill Sent (Zalo)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('sentViaZalo is true', () => pm.expect(pm.response.json().data.sentViaZalo).to.be.true);"] } }],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/api/bills/{{billId}}/mark-sent", "host": ["{{baseUrl}}"], "path": ["api","bills","{{billId}}","mark-sent"] }
+          }
+        },
+        {
+          "name": "Get Zalo Deeplink",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has url', () => pm.expect(pm.response.json().data.url).to.be.a('string'));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/bills/{{billId}}/zalo-link", "host": ["{{baseUrl}}"], "path": ["api","bills","{{billId}}","zalo-link"] }
+          }
+        },
+        {
+          "name": "Add Manual Payment to Bill",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                "const res = pm.response.json();",
+                "if (res.data) pm.collectionVariables.set('paymentId', res.data.id);"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 150000,\n  \"method\": \"CASH\",\n  \"paidAt\": \"2026-05-20T10:00:00\",\n  \"notes\": \"Nộp tiền mặt tại nhà\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/bills/{{billId}}/payments", "host": ["{{baseUrl}}"], "path": ["api","bills","{{billId}}","payments"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "List Unmatched Payments",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                "const res = pm.response.json();",
+                "if (res.data && res.data.content && res.data.content.length > 0) {",
+                "  pm.collectionVariables.set('paymentId', res.data.content[0].id);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/payments/unmatched?page=0&size=20", "host": ["{{baseUrl}}"], "path": ["api","payments","unmatched"], "query": [{"key":"page","value":"0"},{"key":"size","value":"20"}] }
+          }
+        },
+        {
+          "name": "Assign Unmatched Payment to Bill",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"billId\": {{billId}}\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/payments/{{paymentId}}/assign", "host": ["{{baseUrl}}"], "path": ["api","payments","{{paymentId}}","assign"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Debt Report (Unpaid Bills)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/reports/debt", "host": ["{{baseUrl}}"], "path": ["api","reports","debt"] }
+          }
+        },
+        {
+          "name": "Period Summary Report",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));", "pm.test('Has totals', () => { const d = pm.response.json().data; pm.expect(d.totalBilledAmount).to.exist; pm.expect(d.countByStatus).to.exist; });"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/reports/period/{{periodId}}", "host": ["{{baseUrl}}"], "path": ["api","reports","period","{{periodId}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "List All Settings",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/api/settings", "host": ["{{baseUrl}}"], "path": ["api","settings"] }
+          }
+        },
+        {
+          "name": "Update Setting",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Status 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"3000\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/settings/{{settingKey}}", "host": ["{{baseUrl}}"], "path": ["api","settings","{{settingKey}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "SePay Webhook",
+      "item": [
+        {
+          "name": "Webhook - Matched Transfer (TIENDIEN)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Always 200', () => pm.response.to.have.status(200));", "pm.test('success=true', () => pm.expect(pm.response.json().success).to.be.true);"] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Apikey dev-secret" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 100001,\n  \"gateway\": \"TPBank\",\n  \"transactionDate\": \"2026-05-20 10:30:00\",\n  \"accountNumber\": \"1234567890\",\n  \"code\": \"SEPAY001\",\n  \"content\": \"TIENDIEN 2026-05 KH001\",\n  \"transferType\": \"in\",\n  \"transferAmount\": 250000,\n  \"accumulated\": 250000,\n  \"referenceCode\": \"REF100001\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/webhooks/sepay", "host": ["{{baseUrl}}"], "path": ["api","webhooks","sepay"] }
+          }
+        },
+        {
+          "name": "Webhook - Unmatched Transfer",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Always 200', () => pm.response.to.have.status(200));", "pm.test('success=true', () => pm.expect(pm.response.json().success).to.be.true);"] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Apikey dev-secret" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 100002,\n  \"gateway\": \"TPBank\",\n  \"transactionDate\": \"2026-05-20 11:00:00\",\n  \"accountNumber\": \"1234567890\",\n  \"code\": \"SEPAY002\",\n  \"content\": \"Chuyen tien khong ro\",\n  \"transferType\": \"in\",\n  \"transferAmount\": 500000,\n  \"accumulated\": 500000,\n  \"referenceCode\": \"REF100002\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/webhooks/sepay", "host": ["{{baseUrl}}"], "path": ["api","webhooks","sepay"] }
+          }
+        },
+        {
+          "name": "Webhook - Duplicate (Idempotency Check)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Always 200 even for duplicate', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Apikey dev-secret" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 100001,\n  \"gateway\": \"TPBank\",\n  \"transactionDate\": \"2026-05-20 10:30:00\",\n  \"accountNumber\": \"1234567890\",\n  \"code\": \"SEPAY001\",\n  \"content\": \"TIENDIEN 2026-05 KH001\",\n  \"transferType\": \"in\",\n  \"transferAmount\": 250000,\n  \"accumulated\": 250000,\n  \"referenceCode\": \"REF100001\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/webhooks/sepay", "host": ["{{baseUrl}}"], "path": ["api","webhooks","sepay"] }
+          }
+        },
+        {
+          "name": "Webhook - Invalid API Key (expect 401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Returns 401', () => pm.response.to.have.status(401));"] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Apikey wrong-secret" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 100003,\n  \"transferType\": \"in\",\n  \"transferAmount\": 100000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/webhooks/sepay", "host": ["{{baseUrl}}"], "path": ["api","webhooks","sepay"] }
+          }
+        },
+        {
+          "name": "Webhook - Outbound Transfer (skip)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('Always 200', () => pm.response.to.have.status(200));"] } }],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Apikey dev-secret" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 100004,\n  \"transactionDate\": \"2026-05-20 12:00:00\",\n  \"content\": \"TIENDIEN 2026-05 KH002\",\n  \"transferType\": \"out\",\n  \"transferAmount\": 300000,\n  \"referenceCode\": \"REF100004\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/webhooks/sepay", "host": ["{{baseUrl}}"], "path": ["api","webhooks","sepay"] }
+          }
+        }
+      ]
+    }
+  ]
+}

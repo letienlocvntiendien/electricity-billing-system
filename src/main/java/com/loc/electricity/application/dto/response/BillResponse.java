@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 public record BillResponse(
         Long id,
         Long periodId,
+        String periodCode,
         Long customerId,
         String customerCode,
         String customerName,
@@ -29,7 +30,7 @@ public record BillResponse(
 ) {
     public static BillResponse from(Bill b) {
         return new BillResponse(
-                b.getId(), b.getPeriod().getId(),
+                b.getId(), b.getPeriod().getId(), b.getPeriod().getCode(),
                 b.getCustomer().getId(), b.getCustomer().getCode(), b.getCustomer().getFullName(),
                 b.getConsumption(), b.getUnitPrice(), b.getServiceUnitPrice(),
                 b.getElectricityAmount(), b.getServiceAmount(), b.getTotalAmount(),

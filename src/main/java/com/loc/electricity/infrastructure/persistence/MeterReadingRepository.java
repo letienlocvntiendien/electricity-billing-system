@@ -3,13 +3,15 @@ package com.loc.electricity.infrastructure.persistence;
 import com.loc.electricity.domain.reading.MeterReading;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
 
 public interface MeterReadingRepository extends JpaRepository<MeterReading, Long> {
 
-    List<MeterReading> findAllByPeriodId(Long periodId);
+    @Query("SELECT r FROM MeterReading r JOIN FETCH r.customer WHERE r.period.id = :periodId ORDER BY r.customer.code")
+    List<MeterReading> findAllByPeriodId(@Param("periodId") Long periodId);
 
     Optional<MeterReading> findByPeriodIdAndCustomerId(Long periodId, Long customerId);
 

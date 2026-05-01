@@ -1,12 +1,17 @@
 package com.loc.electricity.interfaces.web;
 
+import com.loc.electricity.application.dto.request.CreatePaymentRequest;
 import com.loc.electricity.application.dto.response.ApiResponse;
 import com.loc.electricity.application.dto.response.BillResponse;
+import com.loc.electricity.application.dto.response.PaymentResponse;
 import com.loc.electricity.application.service.BillService;
+import com.loc.electricity.application.service.PaymentService;
 import com.loc.electricity.domain.user.User;
 import com.loc.electricity.infrastructure.zalo.ZaloDeeplinkBuilder;
 import com.loc.electricity.interfaces.security.CurrentUser;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +25,7 @@ import java.util.Map;
 public class BillController {
 
     private final BillService billService;
+    private final PaymentService paymentService;
     private final ZaloDeeplinkBuilder zaloDeeplinkBuilder;
 
     @GetMapping
@@ -51,5 +57,16 @@ public class BillController {
     public ResponseEntity<ApiResponse<Map<String, String>>> zaloLink(@PathVariable Long id) {
         String url = zaloDeeplinkBuilder.build(billService.findById(id));
         return ResponseEntity.ok(ApiResponse.ok(Map.of("url", url != null ? url : "")));
+    }
+
+    @PostMapping("/{id}/payments")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<PaymentResponse>> addPayment(
+            @PathVariable Long id,
+            @Valid @RequestBody CreatePaymentRequest request,
+            @CurrentUser User currentUser) {
+        PaymentResponse response = PaymentResponse.from(
+                paymentService.createManualPayment(id, request, currentUser));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 }
