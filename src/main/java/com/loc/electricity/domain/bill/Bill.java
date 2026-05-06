@@ -39,8 +39,8 @@ public class Bill {
     @Column(name = "unit_price", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(name = "service_unit_price", nullable = false, precision = 10, scale = 2)
-    private BigDecimal serviceUnitPrice;
+    @Column(name = "service_fee", nullable = false, precision = 15, scale = 2)
+    private BigDecimal serviceFee;
 
     @Column(name = "electricity_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal electricityAmount;

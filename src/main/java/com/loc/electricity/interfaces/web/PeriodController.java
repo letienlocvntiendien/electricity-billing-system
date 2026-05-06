@@ -103,6 +103,24 @@ public class PeriodController {
                 PeriodResponse.from(periodService.revert(id, currentUser))));
     }
 
+    @PostMapping("/{id}/submit-readings")
+    @PreAuthorize("hasRole('METER_READER')")
+    public ResponseEntity<ApiResponse<PeriodResponse>> submitReadings(
+            @PathVariable Long id,
+            @CurrentUser User currentUser) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                PeriodResponse.from(periodService.submitReadings(id, currentUser))));
+    }
+
+    @PostMapping("/{id}/verify")
+    @PreAuthorize("hasAnyRole('ACCOUNTANT','ADMIN')")
+    public ResponseEntity<ApiResponse<PeriodResponse>> verify(
+            @PathVariable Long id,
+            @CurrentUser User currentUser) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                PeriodResponse.from(periodService.verify(id, currentUser))));
+    }
+
     @PostMapping("/{id}/close")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<PeriodResponse>> close(

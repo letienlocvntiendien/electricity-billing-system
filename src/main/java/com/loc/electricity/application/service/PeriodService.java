@@ -8,6 +8,7 @@ import com.loc.electricity.application.exception.ResourceNotFoundException;
 import com.loc.electricity.domain.bill.Bill;
 import com.loc.electricity.domain.customer.Customer;
 import com.loc.electricity.domain.period.BillingPeriod;
+import com.loc.electricity.domain.period.EvnInvoice;
 import com.loc.electricity.domain.period.PeriodStatus;
 import com.loc.electricity.domain.reading.MeterReading;
 import com.loc.electricity.domain.shared.AuditAction;
@@ -17,11 +18,13 @@ import com.loc.electricity.domain.user.User;
 import com.loc.electricity.infrastructure.persistence.BillRepository;
 import com.loc.electricity.infrastructure.persistence.BillingPeriodRepository;
 import com.loc.electricity.infrastructure.persistence.CustomerRepository;
+import com.loc.electricity.infrastructure.persistence.EvnInvoiceRepository;
 import com.loc.electricity.infrastructure.persistence.MeterReadingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +43,7 @@ public class PeriodService {
     private final CustomerRepository customerRepository;
     private final MeterReadingRepository meterReadingRepository;
     private final BillRepository billRepository;
+    private final EvnInvoiceRepository evnInvoiceRepository;
     private final CalculationEngine calculationEngine;
     private final PeriodWriteGuard periodWriteGuard;
     private final SystemSettingService systemSettingService;
@@ -73,16 +77,16 @@ public class PeriodService {
                     "A period with code '" + code + "' already exists");
         }
 
-        BigDecimal serviceUnitPrice = request.serviceUnitPrice() != null
-                ? request.serviceUnitPrice()
-                : systemSettingService.getDecimalValue("default_service_unit_price");
+        BigDecimal serviceFee = request.serviceFee() != null
+                ? request.serviceFee()
+                : systemSettingService.getDecimalValue("default_service_fee");
 
         BillingPeriod period = BillingPeriod.builder()
                 .code(code)
                 .name(request.name())
                 .startDate(request.startDate())
                 .endDate(request.endDate())
-                .serviceUnitPrice(serviceUnitPrice)
+                .serviceFee(serviceFee)
                 .build();
         period = billingPeriodRepository.save(period);
 
@@ -94,6 +98,8 @@ public class PeriodService {
         return period;
     }
 
+    // Todo: Still need to check here and validate the value
+    // Define process 
     private void initMeterReadings(BillingPeriod period) {
         List<Customer> activeCustomers = customerRepository.findAllByActiveTrue();
 
@@ -123,12 +129,26 @@ public class PeriodService {
 
         if (request.name() != null) period.setName(request.name());
         if (request.extraFee() != null) period.setExtraFee(request.extraFee());
-        if (request.serviceUnitPrice() != null) period.setServiceUnitPrice(request.serviceUnitPrice());
+        if (request.serviceFee() != null) period.setServiceFee(request.serviceFee());
 
         period = billingPeriodRepository.save(period);
 
-        eventPublisher.publishEvent(new AuditEvent(this, AuditAction.CREATE_PERIOD,
+        eventPublisher.publishEvent(new AuditEvent(this, AuditAction.UPDATE_PERIOD,
                 "BillingPeriod", period.getId(), before, period, updatedBy));
+
+        return period;
+    }
+
+    @Transactional
+    public BillingPeriod submitReadings(Long id, User submittedBy) {
+        BillingPeriod period = findById(id);
+        periodWriteGuard.assertStatus(period, PeriodStatus.OPEN);
+
+        period.setStatus(PeriodStatus.READING_DONE);
+        period = billingPeriodRepository.save(period);
+
+        eventPublisher.publishEvent(new AuditEvent(this, AuditAction.SUBMIT_READINGS,
+                "BillingPeriod", period.getId(), null, period, submittedBy));
 
         return period;
     }
@@ -136,44 +156,83 @@ public class PeriodService {
     public PeriodReviewResponse review(Long id) {
         BillingPeriod period = findById(id);
 
+        List<EvnInvoice> invoices = evnInvoiceRepository.findAllByPeriodId(id);
+        int evnTotalKwh = invoices.stream().mapToInt(EvnInvoice::getKwh).sum();
+        BigDecimal evnTotalAmount = invoices.stream().map(EvnInvoice::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         List<MeterReading> submitted = meterReadingRepository.findAllByPeriodId(id)
                 .stream().filter(r -> r.getReadAt() != null).toList();
 
-        int totalConsumption = submitted.stream().mapToInt(MeterReading::computedConsumption).sum();
+        int totalActualConsumption = submitted.stream().mapToInt(MeterReading::computedConsumption).sum();
+
+        int lossKwh = evnTotalKwh - totalActualConsumption;
+        double lossPercentage = evnTotalKwh > 0
+                ? (double) lossKwh / evnTotalKwh * 100.0
+                : 0.0;
+
+        int lossThreshold;
+        try {
+            lossThreshold = systemSettingService.getIntValue("loss_warning_threshold");
+        } catch (Exception e) {
+            lossThreshold = 15;
+        }
+        boolean lossWarning = lossPercentage > lossThreshold;
 
         BigDecimal previewUnitPrice;
-        if (totalConsumption == 0) {
+        if (totalActualConsumption == 0) {
             previewUnitPrice = BigDecimal.ZERO;
         } else {
-            previewUnitPrice = period.getEvnTotalAmount().add(period.getExtraFee())
-                    .divide(new BigDecimal(totalConsumption), 0, RoundingMode.HALF_UP);
+            previewUnitPrice = evnTotalAmount.add(period.getExtraFee())
+                    .divide(new BigDecimal(totalActualConsumption), 2, RoundingMode.HALF_UP);
         }
 
+        int activeBillCount = (int) customerRepository.findAllByActiveTrue().size();
+        BigDecimal serviceFee = period.getServiceFee();
+
+        // total bills = Σ (consumption × unitPrice) + activeBillCount × serviceFee
         BigDecimal totalBillsAmount = submitted.stream()
-                .map(r -> previewUnitPrice.add(period.getServiceUnitPrice())
-                        .multiply(new BigDecimal(r.computedConsumption())))
+                .map(r -> previewUnitPrice.multiply(new BigDecimal(r.computedConsumption()))
+                        .setScale(0, RoundingMode.HALF_UP)
+                        .add(serviceFee))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal roundingDifference = totalConsumption == 0
+        // Rounding difference: expected vs sum of electricity portions only
+        BigDecimal roundingDifference = totalActualConsumption == 0
                 ? BigDecimal.ZERO
-                : period.getEvnTotalAmount().add(period.getExtraFee())
-                        .subtract(previewUnitPrice.multiply(new BigDecimal(totalConsumption)));
+                : evnTotalAmount.add(period.getExtraFee())
+                        .subtract(previewUnitPrice.multiply(new BigDecimal(totalActualConsumption)));
+
+        String verifiedBy = period.getAccountantVerifiedBy() != null
+                ? period.getAccountantVerifiedBy().getFullName()
+                : null;
 
         return new PeriodReviewResponse(
-                period.getEvnTotalAmount(),
+                evnTotalKwh, evnTotalAmount,
                 period.getExtraFee(),
-                totalConsumption,
+                totalActualConsumption,
+                lossKwh, lossPercentage, lossWarning,
                 previewUnitPrice,
-                period.getServiceUnitPrice(),
+                serviceFee,
+                activeBillCount,
                 totalBillsAmount,
                 roundingDifference,
-                submitted.size());
+                submitted.size(),
+                verifiedBy,
+                period.getAccountantVerifiedAt());
     }
 
     @Transactional
     public BillingPeriod calculate(Long id, User calculatedBy) {
         BillingPeriod period = findById(id);
         periodWriteGuard.assertStatus(period, PeriodStatus.READING_DONE);
+
+        List<EvnInvoice> invoices = evnInvoiceRepository.findAllByPeriodId(id);
+        if (invoices.isEmpty()) {
+            throw new BusinessException("NO_EVN_INVOICE",
+                    "Chưa có hóa đơn EVN nào cho kỳ này.",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
 
         List<MeterReading> submitted = meterReadingRepository.findAllByPeriodId(id)
                 .stream().filter(r -> r.getReadAt() != null).toList();
@@ -185,7 +244,7 @@ public class PeriodService {
 
         CalculationEngine.CalculationOutput result = calculationEngine.calculate(
                 period.getEvnTotalAmount(), period.getExtraFee(),
-                period.getServiceUnitPrice(), inputs);
+                period.getServiceFee(), inputs);
 
         final BillingPeriod savedPeriod = period;
         List<Bill> bills = result.bills().stream().map(b -> {
@@ -197,7 +256,7 @@ public class PeriodService {
                     .customer(reading.getCustomer())
                     .consumption(b.consumption())
                     .unitPrice(b.unitPrice())
-                    .serviceUnitPrice(b.serviceUnitPrice())
+                    .serviceFee(b.serviceFee())
                     .electricityAmount(b.electricityAmount())
                     .serviceAmount(b.serviceAmount())
                     .totalAmount(b.totalAmount())
@@ -219,9 +278,30 @@ public class PeriodService {
     }
 
     @Transactional
+    public BillingPeriod verify(Long id, User verifiedBy) {
+        BillingPeriod period = findById(id);
+        periodWriteGuard.assertStatus(period, PeriodStatus.CALCULATED);
+
+        period.setAccountantVerifiedBy(verifiedBy);
+        period.setAccountantVerifiedAt(LocalDateTime.now());
+        period = billingPeriodRepository.save(period);
+
+        eventPublisher.publishEvent(new AuditEvent(this, AuditAction.VERIFY_PERIOD,
+                "BillingPeriod", period.getId(), null, period, verifiedBy));
+
+        return period;
+    }
+
+    @Transactional
     public BillingPeriod approve(Long id, User approvedBy) {
         BillingPeriod period = findById(id);
         periodWriteGuard.assertStatus(period, PeriodStatus.CALCULATED);
+
+        if (period.getAccountantVerifiedAt() == null) {
+            throw new BusinessException("NOT_VERIFIED",
+                    "Kế toán chưa đối chiếu hóa đơn EVN. Không thể phê duyệt.",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
 
         period.setStatus(PeriodStatus.APPROVED);
         period.setApprovedBy(approvedBy);
@@ -238,13 +318,22 @@ public class PeriodService {
     @Transactional
     public BillingPeriod revert(Long id, User revertedBy) {
         BillingPeriod period = findById(id);
-        periodWriteGuard.assertStatus(period, PeriodStatus.CALCULATED);
+        // Allow revert from CALCULATED or APPROVED
+        if (period.getStatus() != PeriodStatus.CALCULATED && period.getStatus() != PeriodStatus.APPROVED) {
+            throw new BusinessException("INVALID_STATE",
+                    "Revert only allowed from CALCULATED or APPROVED",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
 
         BillingPeriod before = copyForAudit(period);
 
         billRepository.deleteByPeriodId(id);
 
         period.setUnitPrice(null);
+        period.setAccountantVerifiedBy(null);
+        period.setAccountantVerifiedAt(null);
+        period.setApprovedBy(null);
+        period.setApprovedAt(null);
         period.setStatus(PeriodStatus.OPEN);
         period = billingPeriodRepository.save(period);
 

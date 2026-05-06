@@ -1,5 +1,5 @@
 import client from './client'
-import type { ApiResponse, Page, CustomerResponse, CreateCustomerRequest } from '@/types/api'
+import type { ApiResponse, Page, CustomerResponse, CreateCustomerRequest, UpdateCustomerRequest } from '@/types/api'
 
 export const customersApi = {
   list: (activeOnly = false) =>
@@ -15,8 +15,8 @@ export const customersApi = {
   create: (data: CreateCustomerRequest) =>
     client.post<ApiResponse<CustomerResponse>>('/customers', data).then((r) => r.data.data!),
 
-  update: (id: number, data: Partial<CreateCustomerRequest>) =>
-    client.put<ApiResponse<CustomerResponse>>(`/customers/${id}`, data).then((r) => r.data.data!),
+  update: (id: number, data: UpdateCustomerRequest) =>
+    client.patch<ApiResponse<CustomerResponse>>(`/customers/${id}`, data).then((r) => r.data.data!),
 
   remove: (id: number) =>
     client.delete(`/customers/${id}`),

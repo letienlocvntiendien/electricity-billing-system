@@ -9,7 +9,6 @@ import com.loc.electricity.domain.reading.MeterReading;
 import com.loc.electricity.domain.shared.AuditAction;
 import com.loc.electricity.domain.shared.AuditEvent;
 import com.loc.electricity.domain.user.User;
-import com.loc.electricity.infrastructure.persistence.BillingPeriodRepository;
 import com.loc.electricity.infrastructure.persistence.MeterReadingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
@@ -25,7 +24,6 @@ import java.util.List;
 public class MeterReadingService {
 
     private final MeterReadingRepository meterReadingRepository;
-    private final BillingPeriodRepository billingPeriodRepository;
     private final SystemSettingService systemSettingService;
     private final ApplicationEventPublisher eventPublisher;
 
@@ -66,12 +64,10 @@ public class MeterReadingService {
 
         reading = meterReadingRepository.save(reading);
 
-        String warning = checkAnomaly(reading);
+        checkAnomaly(reading);
 
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.UPDATE_METER_READING,
                 "MeterReading", reading.getId(), before, reading, submittedBy));
-
-        autoTransitionIfComplete(period);
 
         return reading;
     }
@@ -104,14 +100,6 @@ public class MeterReadingService {
                     currentConsumption, deviation, avgConsumption);
         }
         return null;
-    }
-
-    private void autoTransitionIfComplete(BillingPeriod period) {
-        long unsubmitted = meterReadingRepository.countByPeriodIdAndReadAtIsNull(period.getId());
-        if (unsubmitted == 0) {
-            period.setStatus(PeriodStatus.READING_DONE);
-            billingPeriodRepository.save(period);
-        }
     }
 
     private MeterReading shallowCopy(MeterReading r) {

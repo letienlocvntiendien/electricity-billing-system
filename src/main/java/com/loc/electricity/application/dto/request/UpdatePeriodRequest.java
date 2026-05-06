@@ -8,5 +8,5 @@ import java.math.BigDecimal;
 public record UpdatePeriodRequest(
         @Size(max = 100) String name,
         @DecimalMin("0") BigDecimal extraFee,
-        @DecimalMin("0") BigDecimal serviceUnitPrice
+        @DecimalMin("0") BigDecimal serviceFee
 ) {}

@@ -4,6 +4,7 @@ import com.loc.electricity.domain.bill.BillStatus;
 import com.loc.electricity.infrastructure.persistence.BillRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
+@Profile("!dev")
 @RequiredArgsConstructor
 @Slf4j
 public class OverdueScheduler {

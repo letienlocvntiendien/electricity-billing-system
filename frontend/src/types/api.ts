@@ -14,7 +14,7 @@ export interface LoginRequest {
 
 export interface LoginResponse {
   accessToken: string
-  refreshToken: string
+  tokenType: string
   username: string
   fullName: string
   role: Role
@@ -53,6 +53,15 @@ export interface CreateCustomerRequest {
   notes?: string
 }
 
+export interface UpdateCustomerRequest {
+  fullName?: string
+  phone?: string
+  zaloPhone?: string
+  meterSerial?: string
+  notes?: string
+  active?: boolean
+}
+
 // ── Billing Period ────────────────────────────────────────────────────────────
 
 export interface PeriodResponse {
@@ -65,18 +74,26 @@ export interface PeriodResponse {
   evnTotalKwh: number
   extraFee: number
   unitPrice: number | null
-  serviceUnitPrice: number
+  serviceFee: number
   status: PeriodStatus
   approvedAt: string | null
   closedAt: string | null
   createdAt: string
+  accountantVerifiedBy: string | null
+  accountantVerifiedAt: string | null
 }
 
 export interface CreatePeriodRequest {
   name: string
   startDate: string
   endDate: string
-  serviceUnitPrice: number
+  serviceFee?: number
+}
+
+export interface UpdatePeriodRequest {
+  name?: string
+  extraFee?: number
+  serviceFee?: number
 }
 
 // ── EVN Invoice ───────────────────────────────────────────────────────────────
@@ -128,7 +145,7 @@ export interface BillResponse {
   customerName: string
   consumption: number
   unitPrice: number
-  serviceUnitPrice: number
+  serviceFee: number
   electricityAmount: number
   serviceAmount: number
   totalAmount: number
@@ -168,14 +185,21 @@ export interface CreatePaymentRequest {
 // ── Period Review (pre-calculate preview) ─────────────────────────────────────
 
 export interface PeriodReviewResponse {
+  evnTotalKwh: number
   evnTotalAmount: number
   extraFee: number
-  totalConsumption: number
+  totalActualConsumption: number
+  lossKwh: number
+  lossPercentage: number
+  lossWarning: boolean
   previewUnitPrice: number
-  serviceUnitPrice: number
+  serviceFee: number
+  activeBillCount: number
   totalBillsAmount: number
   roundingDifference: number
-  readingCount: number
+  submittedReadingCount: number
+  accountantVerifiedBy: string | null
+  accountantVerifiedAt: string | null
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────────

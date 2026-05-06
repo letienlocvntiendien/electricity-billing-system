@@ -15,7 +15,7 @@ public record BillResponse(
         String customerName,
         int consumption,
         BigDecimal unitPrice,
-        BigDecimal serviceUnitPrice,
+        BigDecimal serviceFee,
         BigDecimal electricityAmount,
         BigDecimal serviceAmount,
         BigDecimal totalAmount,
@@ -32,7 +32,7 @@ public record BillResponse(
         return new BillResponse(
                 b.getId(), b.getPeriod().getId(), b.getPeriod().getCode(),
                 b.getCustomer().getId(), b.getCustomer().getCode(), b.getCustomer().getFullName(),
-                b.getConsumption(), b.getUnitPrice(), b.getServiceUnitPrice(),
+                b.getConsumption(), b.getUnitPrice(), b.getServiceFee(),
                 b.getElectricityAmount(), b.getServiceAmount(), b.getTotalAmount(),
                 b.getPaidAmount(), b.getStatus(), b.getPaymentCode(),
                 b.getQrCodeUrl(), b.getPdfUrl(), b.isSentViaZalo(), b.getSentAt(),

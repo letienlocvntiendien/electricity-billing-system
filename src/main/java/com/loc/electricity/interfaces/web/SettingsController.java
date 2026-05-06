@@ -1,8 +1,9 @@
 package com.loc.electricity.interfaces.web;
 
+import com.loc.electricity.application.dto.request.UpdateSettingRequest;
 import com.loc.electricity.application.dto.response.ApiResponse;
+import com.loc.electricity.application.dto.response.SystemSettingResponse;
 import com.loc.electricity.application.service.SystemSettingService;
-import com.loc.electricity.domain.shared.SystemSetting;
 import com.loc.electricity.domain.user.User;
 import com.loc.electricity.interfaces.security.CurrentUser;
 import lombok.RequiredArgsConstructor;
@@ -11,7 +12,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/settings")
@@ -22,18 +22,21 @@ public class SettingsController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
-    public ResponseEntity<ApiResponse<List<SystemSetting>>> list() {
-        return ResponseEntity.ok(ApiResponse.ok(systemSettingService.findAll()));
+    public ResponseEntity<ApiResponse<List<SystemSettingResponse>>> list() {
+        List<SystemSettingResponse> result = systemSettingService.findAll()
+                .stream()
+                .map(SystemSettingResponse::from)
+                .toList();
+        return ResponseEntity.ok(ApiResponse.ok(result));
     }
 
     @PatchMapping("/{key}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<SystemSetting>> update(
+    public ResponseEntity<ApiResponse<SystemSettingResponse>> update(
             @PathVariable String key,
-            @RequestBody Map<String, String> body,
+            @RequestBody UpdateSettingRequest request,
             @CurrentUser User currentUser) {
-        String value = body.get("value");
-        SystemSetting updated = systemSettingService.update(key, value, currentUser);
-        return ResponseEntity.ok(ApiResponse.ok(updated));
+        var updated = systemSettingService.update(key, request.value(), currentUser);
+        return ResponseEntity.ok(ApiResponse.ok(SystemSettingResponse.from(updated)));
     }
 }

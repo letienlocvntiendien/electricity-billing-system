@@ -34,17 +34,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const res = await authApi.login({ username, password })
     localStorage.setItem('accessToken', res.accessToken)
-    localStorage.setItem('refreshToken', res.refreshToken)
-    const authUser: AuthUser = { username: res.username, fullName: res.fullName, role: res.role }
+    const authUser: AuthUser = { username: res.username, fullName: res.fullName, role: res.role as Role }
     localStorage.setItem('user', JSON.stringify(authUser))
     setUser(authUser)
   }, [])
 
   const logout = useCallback(async () => {
-    const refreshToken = localStorage.getItem('refreshToken') ?? ''
-    try { await authApi.logout(refreshToken) } catch { /* ignore */ }
+    try { await authApi.logout() } catch { /* ignore */ }
     localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('refreshToken') // clear legacy key if still stored
     localStorage.removeItem('user')
     setUser(null)
   }, [])

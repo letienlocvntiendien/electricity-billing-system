@@ -1,19 +1,10 @@
 import { useEffect, useState } from 'react'
 import { FileText, AlertTriangle } from 'lucide-react'
 import client from '@/api/client'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
-import type { ApiResponse, BillResponse, BillStatus } from '@/types/api'
-
-const billStatusLabel: Record<BillStatus, string> = {
-  PENDING: 'Chờ', SENT: 'Đã gửi', PARTIAL: 'Một phần',
-  PAID: 'Đã trả', OVERDUE: 'Quá hạn',
-}
-const billStatusVariant: Record<BillStatus, 'default' | 'secondary' | 'success' | 'warning' | 'outline' | 'destructive'> = {
-  PENDING: 'secondary', SENT: 'default', PARTIAL: 'warning',
-  PAID: 'success', OVERDUE: 'destructive',
-}
+import { billStatusLabel, billStatusVariant } from '@/lib/statusMaps'
+import type { ApiResponse, BillResponse } from '@/types/api'
 
 export default function ReportsPage() {
   const [debtBills, setDebtBills] = useState<BillResponse[]>([])
@@ -30,65 +21,99 @@ export default function ReportsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <h1 className="text-2xl font-bold flex items-center gap-2">
-        <FileText className="h-6 w-6" />
-        Báo cáo
-      </h1>
+      {/* Page header */}
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-md"
+          style={{ background: 'hsl(var(--destructive) / 0.12)', color: 'hsl(var(--destructive))' }}
+        >
+          <FileText className="h-4 w-4" />
+        </div>
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Báo cáo</h1>
+          <p className="text-xs text-muted-foreground">Công nợ và tình trạng thanh toán</p>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              Công nợ chưa thu ({debtBills.length} hóa đơn)
-            </CardTitle>
-            <span className="text-sm font-semibold text-destructive">
+      {/* Debt table */}
+      <div className="rounded-lg border bg-card">
+        {/* Card header */}
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid hsl(var(--border))' }}
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-400" />
+            <span className="text-sm font-semibold text-foreground">
+              Công nợ chưa thu
+            </span>
+            {!loading && (
+              <span className="font-mono text-xs text-muted-foreground">
+                ({debtBills.length} hóa đơn)
+              </span>
+            )}
+          </div>
+          {!loading && totalOutstanding > 0 && (
+            <span className="font-mono text-sm font-semibold text-destructive">
               {formatCurrency(totalOutstanding)}
             </span>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <p className="text-muted-foreground text-sm">Đang tải...</p>
-          ) : debtBills.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Không có công nợ.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground">
-                    <th className="text-left py-2 px-3 font-medium">Khách hàng</th>
-                    <th className="text-left py-2 px-3 font-medium">Kỳ</th>
-                    <th className="text-right py-2 px-3 font-medium">Tổng tiền</th>
-                    <th className="text-right py-2 px-3 font-medium">Còn lại</th>
-                    <th className="text-left py-2 px-3 font-medium">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {debtBills.map((b) => (
-                    <tr key={b.id} className="border-b hover:bg-muted/50 transition-colors">
-                      <td className="py-2 px-3">
-                        <span className="font-mono font-medium">{b.customerCode}</span>
-                        <span className="text-muted-foreground ml-2">{b.customerName}</span>
-                      </td>
-                      <td className="py-2 px-3 text-muted-foreground">{b.periodCode}</td>
-                      <td className="py-2 px-3 text-right font-mono">{formatCurrency(b.totalAmount)}</td>
-                      <td className="py-2 px-3 text-right font-mono text-destructive">
-                        {formatCurrency(b.totalAmount - b.paidAmount)}
-                      </td>
-                      <td className="py-2 px-3">
-                        <Badge variant={billStatusVariant[b.status]}>
-                          {billStatusLabel[b.status]}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {loading ? (
+          <p className="px-6 py-10 text-sm text-center text-muted-foreground">Đang tải...</p>
+        ) : debtBills.length === 0 ? (
+          <p className="px-6 py-10 text-sm text-center text-muted-foreground">Không có công nợ.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid hsl(var(--border))' }}>
+                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Khách hàng
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Kỳ
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Tổng tiền
+                  </th>
+                  <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Còn lại
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Trạng thái
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {debtBills.map((b, i) => (
+                  <tr
+                    key={b.id}
+                    className="data-row hover:bg-accent/40 transition-colors"
+                    style={i < debtBills.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="font-mono text-sm font-semibold text-primary">{b.customerCode}</span>
+                      <span className="text-muted-foreground text-sm ml-2">{b.customerName}</span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{b.periodCode}</td>
+                    <td className="px-4 py-3 text-right font-mono text-sm">{formatCurrency(b.totalAmount)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-sm font-semibold text-destructive">
+                      {formatCurrency(b.totalAmount - b.paidAmount)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={billStatusVariant[b.status]}>
+                        {billStatusLabel[b.status]}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

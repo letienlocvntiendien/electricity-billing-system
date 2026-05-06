@@ -18,7 +18,7 @@ public class CalculationEngine {
             Long readingId,
             int consumption,
             BigDecimal unitPrice,
-            BigDecimal serviceUnitPrice,
+            BigDecimal serviceFee,
             BigDecimal electricityAmount,
             BigDecimal serviceAmount,
             BigDecimal totalAmount,
@@ -30,28 +30,30 @@ public class CalculationEngine {
     public CalculationOutput calculate(
             BigDecimal evnTotalAmount,
             BigDecimal extraFee,
-            BigDecimal serviceUnitPrice,
+            BigDecimal serviceFee,
             List<ReadingInput> readings
     ) {
         int totalConsumption = readings.stream().mapToInt(ReadingInput::consumption).sum();
 
         if (totalConsumption == 0) {
             throw new BusinessException("ZERO_CONSUMPTION",
-                    "Total consumption is zero; cannot calculate unit price");
+                    "Tất cả KH đều có consumption=0, không thể tính đơn giá.");
         }
 
         BigDecimal unitPrice = evnTotalAmount.add(extraFee)
-                .divide(new BigDecimal(totalConsumption), 0, RoundingMode.HALF_UP);
+                .divide(new BigDecimal(totalConsumption), 2, RoundingMode.HALF_UP);
 
         List<BillOutput> bills = readings.stream().map(r -> {
-            BigDecimal electricity = unitPrice.multiply(new BigDecimal(r.consumption()));
-            BigDecimal service = serviceUnitPrice.multiply(new BigDecimal(r.consumption()));
+            BigDecimal electricity = unitPrice.multiply(new BigDecimal(r.consumption()))
+                    .setScale(0, RoundingMode.HALF_UP);
+            // service_amount = service_fee (flat, not multiplied by consumption)
+            BigDecimal service = serviceFee;
             BigDecimal total = electricity.add(service);
             BillStatus status = total.compareTo(BigDecimal.ZERO) == 0
                     ? BillStatus.PAID
                     : BillStatus.PENDING;
             return new BillOutput(r.customerId(), r.readingId(), r.consumption(),
-                    unitPrice, serviceUnitPrice, electricity, service, total, status);
+                    unitPrice, serviceFee, electricity, service, total, status);
         }).toList();
 
         return new CalculationOutput(unitPrice, bills);

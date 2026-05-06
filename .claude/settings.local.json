@@ -32,7 +32,23 @@
       "Bash(findstr \":8080\")",
       "Bash(taskkill *)",
       "PowerShell(Stop-Process *)",
-      "Bash(curl -s --connect-timeout 3 http://localhost:8080/api/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"Admin@123\"}')"
+      "Bash(curl -s --connect-timeout 3 http://localhost:8080/api/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"Admin@123\"}')",
+      "Bash(curl -s -X POST http://localhost:8080/api/auth/login -H \"Content-Type: application/json\" -d '{\"username\":\"reader\",\"password\":\"Reader@123\"}')",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\" -Directory -Recurse)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\" -Recurse -Directory)",
+      "Bash(Sort-Object FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\frontend\\\\src\" -Recurse -Force)",
+      "Bash(Select-Object FullName, PSIsContainer)",
+      "Bash(Format-Table -AutoSize)",
+      "PowerShell(node \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\dist\\\\index.js\" 2>&1 | Select-Object -First 10)",
+      "PowerShell($env:MYSQL_HOST=\"127.0.0.1\"; $env:MYSQL_PORT=\"3306\"; $env:MYSQL_USER=\"root\"; $env:MYSQL_PASS=\"123456\"; $env:MYSQL_DB=\"electricity_billing\"; node \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\dist\\\\index.js\" 2>&1 | Select-Object -First 15)",
+      "PowerShell($env:MYSQL_HOST=\"127.0.0.1\"; $env:MYSQL_PORT=\"3306\"; $env:MYSQL_USER=\"root\"; $env:MYSQL_PASS=\"123456\"; $env:MYSQL_DB=\"electricity_billing\"; $env:ALLOW_INSERT_OPERATION=\"false\"; $env:ALLOW_UPDATE_OPERATION=\"false\"; $env:ALLOW_DELETE_OPERATION=\"false\"; node \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\dist\\\\index.js\" 2>&1)",
+      "PowerShell(node --version; $env:MYSQL_HOST=\"127.0.0.1\"; $env:MYSQL_PORT=\"3306\"; $env:MYSQL_USER=\"root\"; $env:MYSQL_PASS=\"123456\"; $env:MYSQL_DB=\"electricity_billing\"; $proc = Start-Process -FilePath \"node\" -ArgumentList \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\dist\\\\index.js\" -PassThru -NoNewWindow -RedirectStandardError \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\stderr.log\" -RedirectStandardOutput \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\stdout.log\"; Start-Sleep -Seconds 3; if \\($proc.HasExited\\) { \"Process exited with code: $\\($proc.ExitCode\\)\"; Get-Content \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\stderr.log\"; Get-Content \"C:\\\\Users\\\\as\\\\mcp\\\\mcp-server-mysql\\\\stdout.log\" } else { \"Process still running \\(good sign\\)\"; $proc.Kill\\(\\) })",
+      "PowerShell(Get-Command *)",
+      "Skill(update-config)",
+      "Bash(Get-ChildItem *)",
+      "Bash(grep -E \"\\\\.java$\")"
     ]
   }
 }

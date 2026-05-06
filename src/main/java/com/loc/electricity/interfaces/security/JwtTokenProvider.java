@@ -17,23 +17,16 @@ public class JwtTokenProvider {
 
     private final SecretKey secretKey;
     private final long accessTokenExpirationMs;
-    private final long refreshTokenExpirationMs;
 
     public JwtTokenProvider(
             @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.access-token-expiration-ms}") long accessTokenExpirationMs,
-            @Value("${app.jwt.refresh-token-expiration-ms}") long refreshTokenExpirationMs) {
+            @Value("${app.jwt.access-token-expiration-ms}") long accessTokenExpirationMs) {
         this.secretKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
         this.accessTokenExpirationMs = accessTokenExpirationMs;
-        this.refreshTokenExpirationMs = refreshTokenExpirationMs;
     }
 
     public String generateAccessToken(UserDetails userDetails) {
         return buildToken(userDetails.getUsername(), accessTokenExpirationMs);
-    }
-
-    public String generateRefreshToken(UserDetails userDetails) {
-        return buildToken(userDetails.getUsername(), refreshTokenExpirationMs);
     }
 
     private String buildToken(String subject, long expirationMs) {

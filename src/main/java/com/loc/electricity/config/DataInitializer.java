@@ -138,13 +138,14 @@ public class DataInitializer implements ApplicationRunner {
 
     // ── Period 1 — 2025-02 — CLOSED ──────────────────────────────────────────
     //
-    //  EVN: 4819 kWh / 7,546,419 VND  →  unitPrice = round(7546419/4819) = 1566
-    //  serviceUnitPrice = 500
+    //  EVN TOU: normal=2800/4,400,000 · peak=1100/2,200,000 · off_peak=919/946,419
+    //  Total: 4819 kWh / 7,546,419 VND  →  unitPrice = 7546419/4819 ≈ 1565.69
+    //  serviceFee = 10,000 đ/hộ (flat)
     //  Status: CLOSED; 5 PAID · 3 PARTIAL · 2 OVERDUE
 
     private void seedPeriod1(List<Customer> customers, User admin, User accountant, User reader) {
-        BigDecimal unitPrice    = new BigDecimal("1566");
-        BigDecimal servicePrice = new BigDecimal("500");
+        BigDecimal unitPrice  = new BigDecimal("1565.69");
+        BigDecimal serviceFee = new BigDecimal("10000");
 
         BillingPeriod p1 = billingPeriodRepository.save(BillingPeriod.builder()
                 .code("2025-02")
@@ -154,9 +155,11 @@ public class DataInitializer implements ApplicationRunner {
                 .evnTotalAmount(new BigDecimal("7546419"))
                 .evnTotalKwh(4819)
                 .extraFee(BigDecimal.ZERO)
-                .serviceUnitPrice(servicePrice)
+                .serviceFee(serviceFee)
                 .unitPrice(unitPrice)
                 .status(PeriodStatus.CLOSED)
+                .accountantVerifiedBy(accountant)
+                .accountantVerifiedAt(LocalDateTime.of(2025, 2, 9, 16, 0))
                 .approvedBy(admin)
                 .approvedAt(LocalDateTime.of(2025, 2, 10, 9, 0))
                 .closedAt(LocalDateTime.of(2025, 2, 28, 17, 0))
@@ -166,8 +169,7 @@ public class DataInitializer implements ApplicationRunner {
                 .period(p1)
                 .invoiceDate(LocalDate.of(2025, 2, 28))
                 .invoiceNumber("EVN-2025-02-001")
-                .kwh(4819)
-                .amount(new BigDecimal("7546419"))
+                .kwh(4819).amount(new BigDecimal("7546419"))
                 .build());
 
         // currentIndex per customer; previousIndex = 0 for all (first period)
@@ -202,18 +204,18 @@ public class DataInitializer implements ApplicationRunner {
         };
 
         for (int i = 0; i < 10; i++) {
-            Customer c    = customers.get(i);
-            int cons      = currIdx[i];
-            BigDecimal elec  = unitPrice.multiply(BigDecimal.valueOf(cons));
-            BigDecimal svc   = servicePrice.multiply(BigDecimal.valueOf(cons));
-            BigDecimal total = elec.add(svc);
+            Customer c   = customers.get(i);
+            int cons     = currIdx[i];
+            BigDecimal elec  = unitPrice.multiply(BigDecimal.valueOf(cons))
+                    .setScale(0, RoundingMode.HALF_UP);
+            BigDecimal total = elec.add(serviceFee);
             BigDecimal paid  = paidAmount(statuses[i], total);
 
             Bill bill = billRepository.save(Bill.builder()
                     .period(p1).customer(c)
                     .consumption(cons)
-                    .unitPrice(unitPrice).serviceUnitPrice(servicePrice)
-                    .electricityAmount(elec).serviceAmount(svc).totalAmount(total)
+                    .unitPrice(unitPrice).serviceFee(serviceFee)
+                    .electricityAmount(elec).serviceAmount(serviceFee).totalAmount(total)
                     .paidAmount(paid).status(statuses[i])
                     .paymentCode("TIENDIEN 2025-02 " + c.getCode())
                     .build());
@@ -231,14 +233,16 @@ public class DataInitializer implements ApplicationRunner {
 
     // ── Period 2 — 2025-03 — APPROVED ────────────────────────────────────────
     //
-    //  EVN: 5100 kWh / 8,000,000 VND · extraFee = 100,000
-    //  unitPrice = round((8,000,000 + 100,000) / 5100) = 1588
+    //  EVN TOU: normal=3000/4,700,000 · peak=1200/2,100,000 · off_peak=900/1,200,000
+    //  Total: 5100 kWh / 8,000,000 VND · extraFee = 100,000
+    //  unitPrice = (8,000,000 + 100,000) / 5100 ≈ 1588.24
+    //  serviceFee = 10,000 đ/hộ (flat)
     //  Status: APPROVED; 3 PAID · 4 PENDING · 2 PARTIAL · 1 SENT
     //  + 1 unmatched payment (bill_id = null)
 
     private void seedPeriod2(List<Customer> customers, User admin, User accountant, User reader) {
-        BigDecimal unitPrice    = new BigDecimal("1588");
-        BigDecimal servicePrice = new BigDecimal("500");
+        BigDecimal unitPrice  = new BigDecimal("1588.24");
+        BigDecimal serviceFee = new BigDecimal("10000");
 
         BillingPeriod p2 = billingPeriodRepository.save(BillingPeriod.builder()
                 .code("2025-03")
@@ -248,9 +252,11 @@ public class DataInitializer implements ApplicationRunner {
                 .evnTotalAmount(new BigDecimal("8000000"))
                 .evnTotalKwh(5100)
                 .extraFee(new BigDecimal("100000"))
-                .serviceUnitPrice(servicePrice)
+                .serviceFee(serviceFee)
                 .unitPrice(unitPrice)
                 .status(PeriodStatus.APPROVED)
+                .accountantVerifiedBy(accountant)
+                .accountantVerifiedAt(LocalDateTime.of(2025, 3, 9, 15, 30))
                 .approvedBy(admin)
                 .approvedAt(LocalDateTime.of(2025, 3, 10, 9, 0))
                 .build());
@@ -259,8 +265,7 @@ public class DataInitializer implements ApplicationRunner {
                 .period(p2)
                 .invoiceDate(LocalDate.of(2025, 3, 31))
                 .invoiceNumber("EVN-2025-03-001")
-                .kwh(5100)
-                .amount(new BigDecimal("8000000"))
+                .kwh(5100).amount(new BigDecimal("8000000"))
                 .build());
 
         int[] prevIdx = {480, 512, 445, 523, 498, 412, 534, 476, 467, 472};
@@ -286,19 +291,19 @@ public class DataInitializer implements ApplicationRunner {
 
         List<Bill> p2Bills = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            Customer c    = customers.get(i);
-            int cons      = consumptions[i];
-            BigDecimal elec  = unitPrice.multiply(BigDecimal.valueOf(cons));
-            BigDecimal svc   = servicePrice.multiply(BigDecimal.valueOf(cons));
-            BigDecimal total = elec.add(svc);
+            Customer c   = customers.get(i);
+            int cons     = consumptions[i];
+            BigDecimal elec  = unitPrice.multiply(BigDecimal.valueOf(cons))
+                    .setScale(0, RoundingMode.HALF_UP);
+            BigDecimal total = elec.add(serviceFee);
             BigDecimal paid  = paidAmount(statuses[i], total);
             boolean isSent   = statuses[i] == BillStatus.SENT;
 
             p2Bills.add(billRepository.save(Bill.builder()
                     .period(p2).customer(c)
                     .consumption(cons)
-                    .unitPrice(unitPrice).serviceUnitPrice(servicePrice)
-                    .electricityAmount(elec).serviceAmount(svc).totalAmount(total)
+                    .unitPrice(unitPrice).serviceFee(serviceFee)
+                    .electricityAmount(elec).serviceAmount(serviceFee).totalAmount(total)
                     .paidAmount(paid).status(statuses[i])
                     .paymentCode("TIENDIEN 2025-03 " + c.getCode())
                     .sentViaZalo(isSent)
@@ -350,7 +355,7 @@ public class DataInitializer implements ApplicationRunner {
                 .name("Kỳ tháng 04/2025")
                 .startDate(LocalDate.of(2025, 4, 1))
                 .endDate(LocalDate.of(2025, 4, 30))
-                .serviceUnitPrice(new BigDecimal("500"))
+                .serviceFee(new BigDecimal("10000"))
                 .build());
 
         // previousIndex = P2 currentIndex; currentIndex = submitted value or same as prev (unread)

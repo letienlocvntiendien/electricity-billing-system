@@ -17,8 +17,10 @@ public record PeriodResponse(
         int evnTotalKwh,
         BigDecimal extraFee,
         BigDecimal unitPrice,
-        BigDecimal serviceUnitPrice,
+        BigDecimal serviceFee,
         PeriodStatus status,
+        String accountantVerifiedBy,
+        LocalDateTime accountantVerifiedAt,
         LocalDateTime approvedAt,
         LocalDateTime closedAt,
         LocalDateTime createdAt
@@ -28,7 +30,9 @@ public record PeriodResponse(
                 p.getId(), p.getCode(), p.getName(),
                 p.getStartDate(), p.getEndDate(),
                 p.getEvnTotalAmount(), p.getEvnTotalKwh(), p.getExtraFee(),
-                p.getUnitPrice(), p.getServiceUnitPrice(), p.getStatus(),
+                p.getUnitPrice(), p.getServiceFee(), p.getStatus(),
+                p.getAccountantVerifiedBy() != null ? p.getAccountantVerifiedBy().getFullName() : null,
+                p.getAccountantVerifiedAt(),
                 p.getApprovedAt(), p.getClosedAt(), p.getCreatedAt());
     }
 }

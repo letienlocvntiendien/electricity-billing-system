@@ -4,26 +4,41 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    /* Night Grid — deep navy + amber electricity */
+    --background: 222 28% 7%;
+    --foreground: 210 18% 90%;
+
+    --card: 222 24% 10%;
+    --card-foreground: 210 18% 90%;
+
+    --popover: 222 24% 11%;
+    --popover-foreground: 210 18% 90%;
+
+    --primary: 38 95% 53%;
+    --primary-foreground: 222 28% 7%;
+
+    --secondary: 222 20% 15%;
+    --secondary-foreground: 210 18% 72%;
+
+    --muted: 222 20% 13%;
+    --muted-foreground: 215 14% 50%;
+
+    --accent: 222 20% 16%;
+    --accent-foreground: 210 18% 90%;
+
+    --destructive: 0 68% 54%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 222 20% 17%;
+    --input: 222 20% 14%;
+    --ring: 38 95% 53%;
+    --radius: 0.375rem;
+
+    /* Semantic extras */
+    --success: 152 60% 40%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 95% 53%;
+    --warning-foreground: 222 28% 7%;
   }
 }
 
@@ -31,8 +46,166 @@
   * {
     @apply border-border;
   }
+
+  html {
+    font-family: 'Sora', system-ui, sans-serif;
+  }
+
   body {
     @apply bg-background text-foreground;
+    font-family: 'Sora', system-ui, sans-serif;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+    -webkit-font-smoothing: antialiased;
   }
+
+  /* Numbers and codes always use JetBrains Mono */
+  .font-mono {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  input[type='number'],
+  input[type='tel'] {
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: hsl(var(--muted)); }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+/* ── Login page ─────────────────────────────────────────────────────────── */
+
+.login-bg {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(hsl(38 95% 53% / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(38 95% 53% / 0.04) 1px, transparent 1px);
+  background-size: 52px 52px;
+  pointer-events: none;
+}
+
+.login-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 40%, hsl(38 95% 53% / 0.05) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.login-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 180px;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    hsl(38 95% 53% / 0.04) 40%,
+    hsl(38 95% 53% / 0.08) 50%,
+    hsl(38 95% 53% / 0.04) 60%,
+    transparent 100%
+  );
+  animation: scan-down 8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes scan-down {
+  0%   { top: -15%; }
+  50%  { top: 110%; }
+  100% { top: -15%; }
+}
+
+.login-card {
+  position: relative;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.875rem;
+  padding: 2.25rem 2rem;
+  box-shadow:
+    0 0 0 1px hsl(var(--border)),
+    0 32px 64px hsl(222 50% 3% / 0.7);
+  animation: card-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.login-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 15%;
+  right: 15%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(var(--primary) / 0.8),
+    transparent
+  );
+  border-radius: 1px;
+}
+
+@keyframes card-rise {
+  0%   { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.login-logo-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  background: hsl(var(--primary));
+  border-radius: 0.625rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 24px hsl(var(--primary) / 0.35), 0 0 8px hsl(var(--primary) / 0.2);
+  flex-shrink: 0;
+}
+
+/* ── Sidebar active nav ─────────────────────────────────────────────────── */
+
+.nav-active {
+  box-shadow: inset 2px 0 0 hsl(var(--primary));
+}
+
+/* ── Table row hover accent ─────────────────────────────────────────────── */
+
+.data-row:hover td:first-child {
+  border-left: 2px solid hsl(var(--primary) / 0.4);
+}
+
+/* ── Card subtle top glow ───────────────────────────────────────────────── */
+
+.card-glow {
+  box-shadow:
+    0 0 0 1px hsl(var(--border)),
+    0 1px 0 0 hsl(var(--primary) / 0.08) inset;
+}
+
+/* ── Mobile layout ──────────────────────────────────────────────────────── */
+
+/* Main content padding clears the fixed 64px bottom nav on mobile */
+.main-scroll {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .main-scroll {
+    padding-bottom: 0;
+  }
+}
+
+/* Reading card animation: submitted state fade */
+@keyframes reading-done {
+  0%  { transform: scale(1.01); }
+  100%{ transform: scale(1); }
+}
+
+.reading-card-done {
+  animation: reading-done 0.25s ease-out both;
 }

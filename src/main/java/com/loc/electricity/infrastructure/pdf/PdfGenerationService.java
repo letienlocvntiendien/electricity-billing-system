@@ -95,7 +95,7 @@ public class PdfGenerationService {
 
             addBillingRow(billingTable, "Tiêu thụ (kWh):", bill.getConsumption() + " kWh", headerFont, normalFont);
             addBillingRow(billingTable, "Đơn giá điện:", formatVnd(bill.getUnitPrice()) + " đ/kWh", headerFont, normalFont);
-            addBillingRow(billingTable, "Đơn giá dịch vụ:", formatVnd(bill.getServiceUnitPrice()) + " đ/kWh", headerFont, normalFont);
+            addBillingRow(billingTable, "Đơn giá dịch vụ:", formatVnd(bill.getServiceFee()) + " đ/kWh", headerFont, normalFont);
             addBillingRow(billingTable, "Tiền điện:", formatVnd(bill.getElectricityAmount()) + " đ", headerFont, normalFont);
             addBillingRow(billingTable, "Tiền dịch vụ:", formatVnd(bill.getServiceAmount()) + " đ", headerFont, normalFont);
             document.add(billingTable);

@@ -1,6 +1,6 @@
 import client from './client'
 import type {
-  ApiResponse, Page, PeriodResponse, CreatePeriodRequest,
+  ApiResponse, Page, PeriodResponse, CreatePeriodRequest, UpdatePeriodRequest,
   EvnInvoiceResponse, CreateEvnInvoiceRequest,
   MeterReadingResponse, BillResponse,
   PeriodReviewResponse,
@@ -18,6 +18,9 @@ export const periodsApi = {
   create: (data: CreatePeriodRequest) =>
     client.post<ApiResponse<PeriodResponse>>('/periods', data).then((r) => r.data.data!),
 
+  update: (id: number, data: UpdatePeriodRequest) =>
+    client.patch<ApiResponse<PeriodResponse>>(`/periods/${id}`, data).then((r) => r.data.data!),
+
   calculate: (id: number) =>
     client.post<ApiResponse<PeriodResponse>>(`/periods/${id}/calculate`).then((r) => r.data.data!),
 
@@ -32,6 +35,12 @@ export const periodsApi = {
 
   close: (id: number) =>
     client.post<ApiResponse<PeriodResponse>>(`/periods/${id}/close`).then((r) => r.data.data!),
+
+  submitReadings: (id: number) =>
+    client.post<ApiResponse<PeriodResponse>>(`/periods/${id}/submit-readings`).then((r) => r.data.data!),
+
+  verify: (id: number) =>
+    client.post<ApiResponse<PeriodResponse>>(`/periods/${id}/verify`).then((r) => r.data.data!),
 
   // EVN invoices  (nested under /periods/{id}/evn-invoices)
   listInvoices: (id: number) =>

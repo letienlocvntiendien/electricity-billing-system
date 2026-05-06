@@ -31,10 +31,10 @@ public class EvnInvoice {
     @Column(name = "invoice_number", nullable = false, length = 50)
     private String invoiceNumber;
 
-    @Column(nullable = false)
+    @Column(name = "kwh", nullable = false)
     private int kwh;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(name = "amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
     @Column(name = "attachment_url", length = 500)

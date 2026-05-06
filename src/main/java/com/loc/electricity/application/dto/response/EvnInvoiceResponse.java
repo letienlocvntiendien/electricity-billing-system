@@ -20,7 +20,7 @@ public record EvnInvoiceResponse(
         return new EvnInvoiceResponse(
                 e.getId(), e.getPeriod().getId(),
                 e.getInvoiceDate(), e.getInvoiceNumber(),
-                e.getKwh(), e.getAmount(), e.getAttachmentUrl(),
-                e.getCreatedAt());
+                e.getKwh(), e.getAmount(),
+                e.getAttachmentUrl(), e.getCreatedAt());
     }
 }

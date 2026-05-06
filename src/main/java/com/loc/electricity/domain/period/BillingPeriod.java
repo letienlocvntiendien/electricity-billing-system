@@ -50,15 +50,22 @@ public class BillingPeriod {
     @Column(name = "unit_price", precision = 10, scale = 2)
     private BigDecimal unitPrice;
 
-    @Column(name = "service_unit_price", nullable = false, precision = 10, scale = 2)
-    private BigDecimal serviceUnitPrice;
+    @Column(name = "service_fee", nullable = false, precision = 15, scale = 2)
+    private BigDecimal serviceFee;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
     private PeriodStatus status = PeriodStatus.OPEN;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "accountant_verified_by")
+    private User accountantVerifiedBy;
+
+    @Column(name = "accountant_verified_at")
+    private LocalDateTime accountantVerifiedAt;
+
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "approved_by")
     private User approvedBy;
 

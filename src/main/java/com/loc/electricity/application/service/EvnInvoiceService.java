@@ -99,13 +99,8 @@ public class EvnInvoiceService {
     }
 
     private void syncPeriodTotals(BillingPeriod period) {
-        List<EvnInvoice> invoices = evnInvoiceRepository.findAllByPeriodId(period.getId());
-        BigDecimal totalAmount = invoices.stream()
-                .map(EvnInvoice::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        int totalKwh = invoices.stream().mapToInt(EvnInvoice::getKwh).sum();
-        period.setEvnTotalAmount(totalAmount);
-        period.setEvnTotalKwh(totalKwh);
+        period.setEvnTotalAmount(evnInvoiceRepository.sumAmountByPeriodId(period.getId()));
+        period.setEvnTotalKwh(evnInvoiceRepository.sumKwhByPeriodId(period.getId()));
         billingPeriodRepository.save(period);
     }
 

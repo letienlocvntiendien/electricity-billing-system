@@ -10,5 +10,5 @@ public record CreatePeriodRequest(
         @NotBlank String name,
         @NotNull LocalDate startDate,
         @NotNull LocalDate endDate,
-        BigDecimal serviceUnitPrice
+        BigDecimal serviceFee
 ) {}
