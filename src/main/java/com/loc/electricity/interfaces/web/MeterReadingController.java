@@ -35,8 +35,7 @@ public class MeterReadingController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateMeterReadingRequest request,
             @CurrentUser User currentUser) {
-        var reading = meterReadingService.submitReading(id, request, currentUser);
-        // Re-check anomaly for response warning (anomaly check happens inside service)
-        return ResponseEntity.ok(ApiResponse.ok(MeterReadingResponse.from(reading)));
+        var response = meterReadingService.submitReading(id, request, currentUser);
+        return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

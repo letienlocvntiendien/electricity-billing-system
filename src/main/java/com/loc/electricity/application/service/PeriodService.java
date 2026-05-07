@@ -6,6 +6,7 @@ import com.loc.electricity.application.dto.response.PeriodReviewResponse;
 import com.loc.electricity.application.exception.BusinessException;
 import com.loc.electricity.application.exception.ResourceNotFoundException;
 import com.loc.electricity.domain.bill.Bill;
+import com.loc.electricity.domain.bill.BillStatus;
 import com.loc.electricity.domain.customer.Customer;
 import com.loc.electricity.domain.period.BillingPeriod;
 import com.loc.electricity.domain.period.EvnInvoice;
@@ -69,6 +70,12 @@ public class PeriodService {
     public BillingPeriod createPeriod(CreatePeriodRequest request, User createdBy) {
         if (request.endDate().isBefore(request.startDate())) {
             throw new BusinessException("INVALID_DATE_RANGE", "end_date must be >= start_date");
+        }
+
+        if (billingPeriodRepository.existsByDateOverlap(request.startDate(), request.endDate())) {
+            throw new BusinessException("PERIOD_DATE_OVERLAP",
+                    "Khoảng thời gian này trùng lặp với kỳ điện đã tồn tại.",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
         }
 
         String code = generateCode(request.startDate(), request.endDate());
@@ -347,6 +354,14 @@ public class PeriodService {
     public BillingPeriod close(Long id, User closedBy) {
         BillingPeriod period = findById(id);
         periodWriteGuard.assertStatus(period, PeriodStatus.APPROVED);
+
+        long unpaidCount = billRepository.countUnpaidByPeriodId(id,
+                List.of(BillStatus.PAID));
+        if (unpaidCount > 0) {
+            throw new BusinessException("UNPAID_BILLS",
+                    unpaidCount + " hóa đơn chưa thanh toán. Vui lòng hoàn tất thu tiền trước khi đóng kỳ.",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
 
         period.setStatus(PeriodStatus.CLOSED);
         period.setClosedAt(LocalDateTime.now());

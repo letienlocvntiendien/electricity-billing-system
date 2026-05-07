@@ -271,8 +271,9 @@ Mọi mutation quan trọng. JSON before/after.
 ```
 
 **Transitions:**
+
 | From | To | Action | Role | Side effects |
-|---|---|---|---|---|
+|---    |---|---|---|---|
 | `-` | `OPEN` | Create period | ADMIN | Auto-clone customer list, init `meter_reading` rows với `previous_index` = current_index kỳ trước |
 | `OPEN` | `READING_DONE` | **Explicit submit** | METER_READER | Confirm modal trên UI; sau bước này METER_READER không sửa được |
 | `READING_DONE` | `CALCULATED` | Calculate bills | ACCOUNTANT/ADMIN | Tính `unit_price`, tạo N `bill` records |

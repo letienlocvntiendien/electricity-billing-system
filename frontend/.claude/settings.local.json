@@ -3,7 +3,11 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(xargs grep *)",
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\frontend\\\\src\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName } | Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\" -Recurse -Name)",
+      "Bash(./mvnw compile *)",
+      "Bash(cmd /c \"mvnw.cmd compile -q 2>&1\")"
     ]
   }
 }

@@ -1,6 +1,7 @@
 package com.loc.electricity.application.service;
 
 import com.loc.electricity.application.dto.request.UpdateMeterReadingRequest;
+import com.loc.electricity.application.dto.response.MeterReadingResponse;
 import com.loc.electricity.application.exception.BusinessException;
 import com.loc.electricity.application.exception.ResourceNotFoundException;
 import com.loc.electricity.domain.period.BillingPeriod;
@@ -37,7 +38,7 @@ public class MeterReadingService {
     }
 
     @Transactional
-    public MeterReading submitReading(Long id, UpdateMeterReadingRequest request, User submittedBy) {
+    public MeterReadingResponse submitReading(Long id, UpdateMeterReadingRequest request, User submittedBy) {
         MeterReading reading = findById(id);
         BillingPeriod period = reading.getPeriod();
 
@@ -64,12 +65,12 @@ public class MeterReadingService {
 
         reading = meterReadingRepository.save(reading);
 
-        checkAnomaly(reading);
+        String warning = checkAnomaly(reading);
 
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.UPDATE_METER_READING,
                 "MeterReading", reading.getId(), before, reading, submittedBy));
 
-        return reading;
+        return MeterReadingResponse.from(reading, warning);
     }
 
     private String checkAnomaly(MeterReading reading) {

@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle, Pencil, Info, AlertCircle, Search, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { periodsApi } from '@/api/periods'
 import { readingsApi } from '@/api/readings'
 import { billsApi } from '@/api/bills'
@@ -14,10 +14,19 @@ import { formatCurrency, cn } from '@/lib/utils'
 import { periodStatusLabel, periodStatusVariant, billStatusLabel, billStatusVariant } from '@/lib/statusMaps'
 import type {
   PeriodResponse, BillResponse, MeterReadingResponse,
-  EvnInvoiceResponse, PaymentMethod, PeriodReviewResponse,
+  EvnInvoiceResponse, PaymentMethod, PeriodReviewResponse, UpdatePeriodRequest, BillStatus,
 } from '@/types/api'
 
 type Tab = 'invoices' | 'readings' | 'bills'
+type BillSortCol = 'customerCode' | 'consumption' | 'unitPrice' | 'serviceFee' | 'totalAmount' | 'paidAmount' | 'status' | ''
+type ReadingSortCol = 'customerCode' | 'previousIndex' | 'currentIndex' | 'consumption' | 'readAt' | ''
+
+function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
+  if (!active) return <ArrowUpDown className="h-3 w-3 opacity-30 ml-0.5 inline flex-shrink-0" />
+  return dir === 'asc'
+    ? <ArrowUp className="h-3 w-3 ml-0.5 inline flex-shrink-0" />
+    : <ArrowDown className="h-3 w-3 ml-0.5 inline flex-shrink-0" />
+}
 
 const methodLabel: Record<PaymentMethod, string> = {
   BANK_TRANSFER: 'Chuyển khoản',
@@ -70,6 +79,21 @@ export default function PeriodDetailPage() {
   const [reviewData, setReviewData] = useState<PeriodReviewResponse | null>(null)
   const [reviewLoading, setReviewLoading] = useState(false)
 
+  const [editingReadingId, setEditingReadingId] = useState<number | null>(null)
+  const [editReadingInput, setEditReadingInput] = useState('')
+  const [editPeriodOpen, setEditPeriodOpen] = useState(false)
+  const [editPeriodForm, setEditPeriodForm] = useState<UpdatePeriodRequest>({})
+  const [editPeriodSaving, setEditPeriodSaving] = useState(false)
+  const [editPeriodError, setEditPeriodError] = useState<string | null>(null)
+
+  const [billSearch, setBillSearch] = useState('')
+  const [billStatusFilter, setBillStatusFilter] = useState<BillStatus | 'ALL'>('ALL')
+  const [billSort, setBillSort] = useState<{ col: BillSortCol; dir: 'asc' | 'desc' }>({ col: '', dir: 'asc' })
+
+  const [readingSearch, setReadingSearch] = useState('')
+  const [readingSubmittedFilter, setReadingSubmittedFilter] = useState<'ALL' | 'SUBMITTED' | 'PENDING'>('ALL')
+  const [readingSort, setReadingSort] = useState<{ col: ReadingSortCol; dir: 'asc' | 'desc' }>({ col: '', dir: 'asc' })
+
   const [invoiceForm, setInvoiceForm] = useState({
     invoiceDate: '', invoiceNumber: '', kwh: '', amount: '',
   })
@@ -105,11 +129,19 @@ export default function PeriodDetailPage() {
   }, [recentlyDoneId])
 
   async function handleAction(action: 'calculate' | 'approve' | 'revert' | 'close' | 'verify') {
+    let closeMsg = 'Đóng kỳ này?'
+    if (action === 'close') {
+      const unpaid = bills.filter((b) => b.status !== 'PAID')
+      if (unpaid.length > 0) {
+        const remaining = unpaid.reduce((s, b) => s + b.totalAmount - b.paidAmount, 0)
+        closeMsg = `Đóng kỳ này?\n\n⚠️ ${unpaid.length} hộ chưa thanh toán đủ (còn lại ${formatCurrency(remaining)}).\nBạn vẫn có thể đóng và theo dõi công nợ sau.`
+      }
+    }
     const confirmMsg: Record<typeof action, string> = {
       calculate: 'Tính tiền cho kỳ này?',
       approve: 'Duyệt kỳ này? Sau khi duyệt không thể sửa dữ liệu.',
-      revert: 'Hoàn về OPEN? Tất cả hóa đơn sẽ bị xóa.',
-      close: 'Đóng kỳ này?',
+      revert: 'Hoàn về OPEN?\n\nTất cả hóa đơn đã tính sẽ bị xóa.\nChỉ số đồng hồ được giữ nguyên.\nBạn có thể sửa chỉ số và tính lại sau.',
+      close: closeMsg,
       verify: 'Xác nhận đã đối chiếu hóa đơn EVN?',
     }
     if (!window.confirm(confirmMsg[action])) return
@@ -191,6 +223,41 @@ export default function PeriodDetailPage() {
       alert(apiError(e, 'Lỗi ghi chỉ số.'))
     } finally {
       setSubmittingId(null)
+    }
+  }
+
+  async function handleEditReading(reading: MeterReadingResponse) {
+    const currentIndex = Number(editReadingInput)
+    if (!editReadingInput || isNaN(currentIndex) || currentIndex < reading.previousIndex) {
+      alert('Chỉ số mới phải ≥ chỉ số cũ.')
+      return
+    }
+    setSubmittingId(reading.id)
+    try {
+      const updated = await readingsApi.submit(reading.id, currentIndex)
+      setReadings((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+      setEditingReadingId(null)
+      setEditReadingInput('')
+    } catch (e: unknown) {
+      alert(apiError(e, 'Lỗi sửa chỉ số.'))
+    } finally {
+      setSubmittingId(null)
+    }
+  }
+
+  async function handleEditPeriod(e: React.SyntheticEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setEditPeriodSaving(true)
+    setEditPeriodError(null)
+    try {
+      const updated = await periodsApi.update(periodId, editPeriodForm)
+      setPeriod(updated)
+      setEditPeriodOpen(false)
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } } }
+      setEditPeriodError(err.response?.data?.error ?? 'Không thể cập nhật kỳ.')
+    } finally {
+      setEditPeriodSaving(false)
     }
   }
 
@@ -276,6 +343,81 @@ export default function PeriodDetailPage() {
     }
   }
 
+  const displayBills = useMemo(() => {
+    let result = [...bills]
+    if (billSearch.trim()) {
+      const q = billSearch.toLowerCase()
+      result = result.filter((b) =>
+        b.customerCode.toLowerCase().includes(q) ||
+        b.customerName.toLowerCase().includes(q)
+      )
+    }
+    if (billStatusFilter !== 'ALL') {
+      result = result.filter((b) => b.status === billStatusFilter)
+    }
+    if (billSort.col) {
+      const col = billSort.col
+      const dir = billSort.dir === 'asc' ? 1 : -1
+      result.sort((a, b) => {
+        const av = a[col as keyof BillResponse]
+        const bv = b[col as keyof BillResponse]
+        if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
+        if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv, 'vi') * dir
+        return 0
+      })
+    }
+    return result
+  }, [bills, billSearch, billStatusFilter, billSort])
+
+  function toggleSort(col: BillSortCol) {
+    setBillSort((prev) => ({
+      col,
+      dir: prev.col === col && prev.dir === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
+  const displayReadings = useMemo(() => {
+    let result = [...readings]
+    if (readingSearch.trim()) {
+      const q = readingSearch.toLowerCase()
+      result = result.filter((r) =>
+        r.customerCode.toLowerCase().includes(q) ||
+        r.customerFullName.toLowerCase().includes(q)
+      )
+    }
+    if (readingSubmittedFilter === 'SUBMITTED') result = result.filter((r) => r.submitted)
+    else if (readingSubmittedFilter === 'PENDING') result = result.filter((r) => !r.submitted)
+    if (readingSort.col) {
+      const col = readingSort.col
+      const dir = readingSort.dir === 'asc' ? 1 : -1
+      result.sort((a, b) => {
+        if (col === 'readAt') {
+          const av = a.readAt ? new Date(a.readAt).getTime() : -Infinity
+          const bv = b.readAt ? new Date(b.readAt).getTime() : -Infinity
+          return (av - bv) * dir
+        }
+        const av = a[col as keyof MeterReadingResponse]
+        const bv = b[col as keyof MeterReadingResponse]
+        if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
+        if (typeof av === 'string' && typeof bv === 'string') return av.localeCompare(bv, 'vi') * dir
+        return 0
+      })
+    } else {
+      result.sort((a, b) => {
+        if (a.submitted === b.submitted) return a.customerCode.localeCompare(b.customerCode, 'vi')
+        return a.submitted ? 1 : -1
+      })
+    }
+    return result
+  }, [readings, readingSearch, readingSubmittedFilter, readingSort])
+
+  function toggleReadingSort(col: ReadingSortCol) {
+    setReadingSort((prev) => ({
+      col,
+      dir: prev.col === col && prev.dir === 'asc' ? 'desc' : 'asc',
+    }))
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -290,12 +432,6 @@ export default function PeriodDetailPage() {
   const showBillActions = period.status === 'APPROVED' || period.status === 'CLOSED'
   const submittedCount = readings.filter((r) => r.submitted).length
   const totalConsumption = readings.filter((r) => r.submitted).reduce((sum, r) => sum + r.consumption, 0)
-
-  // Mobile: unsubmitted readings sorted first
-  const sortedReadings = [...readings].sort((a, b) => {
-    if (a.submitted === b.submitted) return 0
-    return a.submitted ? 1 : -1
-  })
 
   const tabList: [Tab, string][] = [
     ...(isAccountant ? [['invoices', `HD EVN (${invoices.length})`] as [Tab, string]] : []),
@@ -320,6 +456,19 @@ export default function PeriodDetailPage() {
             <Badge variant={periodStatusVariant[period.status]}>
               {periodStatusLabel[period.status]}
             </Badge>
+            {isAccountant && !['APPROVED', 'CLOSED'].includes(period.status) && (
+              <button
+                onClick={() => {
+                  setEditPeriodForm({ name: period.name, serviceFee: period.serviceFee, extraFee: period.extraFee })
+                  setEditPeriodError(null)
+                  setEditPeriodOpen(true)
+                }}
+                className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
+                title="Chỉnh sửa kỳ"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           <p className="font-mono text-xs text-muted-foreground mt-0.5">
             {period.startDate} → {period.endDate}
@@ -654,34 +803,93 @@ export default function PeriodDetailPage() {
             </div>
           )}
 
+          {/* Info banner for correction guidance */}
+          {['READING_DONE', 'CALCULATED'].includes(period.status) && isAdmin && (
+            <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/8 px-3 py-2.5 text-sm text-blue-400">
+              <Info className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>
+                Để sửa chỉ số đồng hồ, dùng nút <strong>Hoàn về</strong> trong thanh thao tác để quay về trạng thái OPEN.
+              </span>
+            </div>
+          )}
+
           {/* ── Desktop table ── */}
           <div className="hidden md:block rounded-lg border bg-card">
-            <div
-              className="px-5 py-4"
-              style={{ borderBottom: '1px solid hsl(var(--border))' }}
-            >
-              <span className="text-sm font-semibold">Chỉ số công tơ</span>
+            {/* Header with search + filter */}
+            <div className="px-5 pt-4 pb-3 space-y-2.5" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold">Chỉ số công tơ</span>
+                {(readingSearch || readingSubmittedFilter !== 'ALL') && (
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {displayReadings.length}/{readings.length} hộ
+                  </span>
+                )}
+              </div>
+              {readings.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  <div className="relative flex-1 min-w-36">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Tìm khách hàng..."
+                      value={readingSearch}
+                      onChange={(e) => setReadingSearch(e.target.value)}
+                      className="h-8 text-sm pl-8 pr-7"
+                    />
+                    {readingSearch && (
+                      <button
+                        onClick={() => setReadingSearch('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <select
+                    value={readingSubmittedFilter}
+                    onChange={(e) => setReadingSubmittedFilter(e.target.value as 'ALL' | 'SUBMITTED' | 'PENDING')}
+                    className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="ALL">Tất cả</option>
+                    <option value="SUBMITTED">Đã ghi</option>
+                    <option value="PENDING">Chưa đọc</option>
+                  </select>
+                </div>
+              )}
             </div>
+            {readings.length === 0 ? (
+              <p className="px-5 py-8 text-sm text-center text-muted-foreground">Chưa có dữ liệu chỉ số.</p>
+            ) : displayReadings.length === 0 ? (
+              <p className="px-5 py-8 text-sm text-center text-muted-foreground">Không tìm thấy hộ phù hợp.</p>
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-                    {['Khách hàng', 'Chỉ số cũ', 'Chỉ số mới', 'Tiêu thụ', 'Đọc lúc'].map((h) => (
+                    {([
+                      ['customerCode', 'Khách hàng', false],
+                      ['previousIndex', 'Chỉ số cũ', true],
+                      ['currentIndex', 'Chỉ số mới', true],
+                      ['consumption', 'Tiêu thụ', true],
+                      ['readAt', 'Đọc lúc', false],
+                    ] as [ReadingSortCol, string, boolean][]).map(([col, label, right]) => (
                       <th
-                        key={h}
-                        className={cn(
-                          'px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground',
-                          ['Chỉ số cũ', 'Chỉ số mới', 'Tiêu thụ'].includes(h) ? 'text-right' : 'text-left',
-                        )}
+                        key={col}
+                        className={cn('px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground', right ? 'text-right' : 'text-left')}
                       >
-                        {h}
+                        <button
+                          onClick={() => toggleReadingSort(col)}
+                          className="inline-flex items-center gap-0.5 hover:text-foreground transition-colors"
+                        >
+                          {label}
+                          <SortIcon active={readingSort.col === col} dir={readingSort.dir} />
+                        </button>
                       </th>
                     ))}
                     {canSubmitReadings && <th className="px-4 py-3" />}
                   </tr>
                 </thead>
                 <tbody>
-                  {readings.map((r, i) => (
+                  {displayReadings.map((r, i) => (
                     <tr
                       key={r.id}
                       className={cn(
@@ -689,7 +897,7 @@ export default function PeriodDetailPage() {
                         !r.submitted ? 'hover:bg-amber-500/5' : 'hover:bg-accent/40',
                       )}
                       style={{
-                        ...(i < readings.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}),
+                        ...(i < displayReadings.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}),
                         ...(!r.submitted ? { background: 'hsl(38 95% 53% / 0.03)' } : {}),
                       }}
                     >
@@ -700,7 +908,19 @@ export default function PeriodDetailPage() {
                       <td className="px-4 py-3 text-right font-mono">{r.previousIndex}</td>
                       <td className="px-4 py-3 text-right">
                         {r.submitted ? (
-                          <span className="font-mono">{r.currentIndex}</span>
+                          editingReadingId === r.id ? (
+                            <Input
+                              type="number"
+                              inputMode="numeric"
+                              min={r.previousIndex}
+                              value={editReadingInput}
+                              onChange={(e) => setEditReadingInput(e.target.value)}
+                              className="h-7 w-24 text-right font-mono ml-auto"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="font-mono">{r.currentIndex}</span>
+                          )
                         ) : canSubmitReadings ? (
                           <Input
                             type="number"
@@ -722,16 +942,23 @@ export default function PeriodDetailPage() {
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {r.readAt ? (
-                          <span className="text-muted-foreground text-xs">
-                            {new Date(r.readAt).toLocaleString('vi-VN')}
-                          </span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-muted-foreground text-xs">
+                              {new Date(r.readAt).toLocaleString('vi-VN')}
+                            </span>
+                            {r.warning && (
+                              <span className="flex items-center gap-1 text-amber-400 text-xs font-medium">
+                                <AlertTriangle className="h-3 w-3" /> Bất thường
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-amber-400 text-xs font-medium">Chưa đọc</span>
                         )}
                       </td>
                       {canSubmitReadings && (
                         <td className="px-4 py-3">
-                          {!r.submitted && (
+                          {!r.submitted ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -742,7 +969,32 @@ export default function PeriodDetailPage() {
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                               ) : 'Ghi'}
                             </Button>
-                          )}
+                          ) : period.status === 'OPEN' && editingReadingId === r.id ? (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                disabled={submittingId === r.id || !editReadingInput}
+                                onClick={() => handleEditReading(r)}
+                              >
+                                {submittingId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Lưu'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => { setEditingReadingId(null); setEditReadingInput('') }}
+                              >
+                                Hủy
+                              </Button>
+                            </div>
+                          ) : period.status === 'OPEN' ? (
+                            <button
+                              onClick={() => { setEditingReadingId(r.id); setEditReadingInput(String(r.currentIndex)) }}
+                              className="p-1.5 rounded hover:bg-accent/60 text-muted-foreground hover:text-foreground transition-colors"
+                              title="Sửa chỉ số"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          ) : null}
                         </td>
                       )}
                     </tr>
@@ -750,11 +1002,48 @@ export default function PeriodDetailPage() {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
 
           {/* ── Mobile reading cards ── */}
           <div className="md:hidden space-y-3">
-            {sortedReadings.map((r) => {
+            {readings.length > 0 && (
+              <div className="flex flex-wrap gap-2 items-center">
+                <div className="relative flex-1 min-w-36">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Tìm khách hàng..."
+                    value={readingSearch}
+                    onChange={(e) => setReadingSearch(e.target.value)}
+                    className="h-8 text-sm pl-8 pr-7"
+                  />
+                  {readingSearch && (
+                    <button
+                      onClick={() => setReadingSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={readingSubmittedFilter}
+                  onChange={(e) => setReadingSubmittedFilter(e.target.value as 'ALL' | 'SUBMITTED' | 'PENDING')}
+                  className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="ALL">Tất cả</option>
+                  <option value="SUBMITTED">Đã ghi</option>
+                  <option value="PENDING">Chưa đọc</option>
+                </select>
+                {(readingSearch || readingSubmittedFilter !== 'ALL') && (
+                  <span className="text-xs text-muted-foreground">{displayReadings.length}/{readings.length}</span>
+                )}
+              </div>
+            )}
+            {displayReadings.length === 0 && readings.length > 0 && (
+              <p className="py-6 text-sm text-center text-muted-foreground">Không tìm thấy hộ phù hợp.</p>
+            )}
+            {displayReadings.map((r) => {
               const isDone = r.submitted
               const isJustDone = recentlyDoneId === r.id
 
@@ -805,28 +1094,66 @@ export default function PeriodDetailPage() {
 
                     {/* Reading values */}
                     {isDone ? (
-                      <div className="flex items-center gap-3 mb-1">
-                        <div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Cũ</p>
-                          <p className="font-mono text-base font-semibold text-foreground">
-                            {r.previousIndex}
-                          </p>
+                      editingReadingId === r.id ? (
+                        <div className="flex gap-2 mt-1 mb-2">
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            min={r.previousIndex}
+                            value={editReadingInput}
+                            onChange={(e) => setEditReadingInput(e.target.value)}
+                            className="flex-1 h-12 text-center font-mono text-lg"
+                            autoFocus
+                          />
+                          <Button
+                            className="h-12 px-4"
+                            disabled={submittingId === r.id || !editReadingInput}
+                            onClick={() => handleEditReading(r)}
+                          >
+                            {submittingId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Lưu'}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="h-12 px-3"
+                            onClick={() => { setEditingReadingId(null); setEditReadingInput('') }}
+                          >
+                            Hủy
+                          </Button>
                         </div>
-                        <span className="text-muted-foreground mt-2">→</span>
-                        <div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Mới</p>
-                          <p className="font-mono text-base font-semibold text-foreground">
-                            {r.currentIndex}
-                          </p>
+                      ) : (
+                        <div className="flex items-center gap-3 mb-1">
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Cũ</p>
+                            <p className="font-mono text-base font-semibold text-foreground">
+                              {r.previousIndex}
+                            </p>
+                          </div>
+                          <span className="text-muted-foreground mt-2">→</span>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Mới</p>
+                            <p className="font-mono text-base font-semibold text-foreground">
+                              {r.currentIndex}
+                            </p>
+                          </div>
+                          <span className="text-muted-foreground mt-2">=</span>
+                          <div>
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Tiêu thụ</p>
+                            <p className="font-mono text-base font-bold text-emerald-400">
+                              {r.consumption} kWh
+                            </p>
+                          </div>
+                          {period.status === 'OPEN' && (
+                            <button
+                              onClick={() => { setEditingReadingId(r.id); setEditReadingInput(String(r.currentIndex)) }}
+                              className="ml-auto p-1.5 rounded hover:bg-accent/60 text-muted-foreground hover:text-foreground transition-colors"
+                              title="Sửa chỉ số"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
-                        <span className="text-muted-foreground mt-2">=</span>
-                        <div>
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Tiêu thụ</p>
-                          <p className="font-mono text-base font-bold text-emerald-400">
-                            {r.consumption} kWh
-                          </p>
-                        </div>
-                      </div>
+                      )
                     ) : (
                       <div className="flex items-center gap-2 mb-3">
                         <div className="mr-1">
@@ -874,6 +1201,12 @@ export default function PeriodDetailPage() {
                         {new Date(r.readAt).toLocaleString('vi-VN')}
                       </p>
                     )}
+                    {isDone && r.warning && (
+                      <div className="flex items-center gap-1.5 mt-1.5 rounded px-2 py-1 bg-amber-500/10 border border-amber-500/20">
+                        <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
+                        <span className="text-xs text-amber-400">{r.warning}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )
@@ -885,15 +1218,56 @@ export default function PeriodDetailPage() {
       {/* ── Bills tab ────────────────────────────────────────────────── */}
       {tab === 'bills' && (
         <div className="rounded-lg border bg-card">
-          <div
-            className="px-5 py-4"
-            style={{ borderBottom: bills.length > 0 ? '1px solid hsl(var(--border))' : undefined }}
-          >
-            <span className="text-sm font-semibold">Hóa đơn khách hàng</span>
+          {/* Header: title + search + filter */}
+          <div className="px-5 pt-4 pb-3 space-y-2.5" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold">Hóa đơn khách hàng</span>
+              {(billSearch || billStatusFilter !== 'ALL') && (
+                <span className="text-xs text-muted-foreground flex-shrink-0">
+                  {displayBills.length}/{bills.length} hóa đơn
+                </span>
+              )}
+            </div>
+            {bills.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                <div className="relative flex-1 min-w-36">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Tìm khách hàng..."
+                    value={billSearch}
+                    onChange={(e) => setBillSearch(e.target.value)}
+                    className="h-8 text-sm pl-8 pr-7"
+                  />
+                  {billSearch && (
+                    <button
+                      onClick={() => setBillSearch('')}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+                <select
+                  value={billStatusFilter}
+                  onChange={(e) => setBillStatusFilter(e.target.value as BillStatus | 'ALL')}
+                  className="h-8 rounded-md border border-input bg-transparent px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="ALL">Tất cả trạng thái</option>
+                  {(['PENDING', 'SENT', 'PARTIAL', 'PAID', 'OVERDUE'] as const).map((s) => (
+                    <option key={s} value={s}>{billStatusLabel[s]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
+
           {bills.length === 0 ? (
             <p className="px-5 py-8 text-sm text-center text-muted-foreground">
               Chưa có hóa đơn — cần tính tiền trước.
+            </p>
+          ) : displayBills.length === 0 ? (
+            <p className="px-5 py-8 text-sm text-center text-muted-foreground">
+              Không tìm thấy hóa đơn phù hợp.
             </p>
           ) : (
             <>
@@ -902,17 +1276,48 @@ export default function PeriodDetailPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-                      {['Khách hàng', 'kWh', 'Tổng tiền', 'Đã trả', 'Trạng thái'].map((h) => (
-                        <th
-                          key={h}
-                          className={cn(
-                            'px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground',
-                            ['kWh', 'Tổng tiền', 'Đã trả'].includes(h) ? 'text-right' : 'text-left',
-                          )}
-                        >
-                          {h}
-                        </th>
-                      ))}
+                      {/* Khách hàng — sortable */}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-left">
+                        <button className="flex items-center hover:text-foreground transition-colors" onClick={() => toggleSort('customerCode')}>
+                          Khách hàng <SortIcon active={billSort.col === 'customerCode'} dir={billSort.dir} />
+                        </button>
+                      </th>
+                      {/* kWh */}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
+                        <button className="flex items-center ml-auto hover:text-foreground transition-colors" onClick={() => toggleSort('consumption')}>
+                          kWh <SortIcon active={billSort.col === 'consumption'} dir={billSort.dir} />
+                        </button>
+                      </th>
+                      {/* Đơn giá */}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
+                        <button className="flex items-center ml-auto hover:text-foreground transition-colors" onClick={() => toggleSort('unitPrice')}>
+                          Đơn giá <SortIcon active={billSort.col === 'unitPrice'} dir={billSort.dir} />
+                        </button>
+                      </th>
+                      {/* Phí DV */}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
+                        <button className="flex items-center ml-auto hover:text-foreground transition-colors" onClick={() => toggleSort('serviceFee')}>
+                          Phí DV <SortIcon active={billSort.col === 'serviceFee'} dir={billSort.dir} />
+                        </button>
+                      </th>
+                      {/* Tổng tiền */}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
+                        <button className="flex items-center ml-auto hover:text-foreground transition-colors" onClick={() => toggleSort('totalAmount')}>
+                          Tổng tiền <SortIcon active={billSort.col === 'totalAmount'} dir={billSort.dir} />
+                        </button>
+                      </th>
+                      {/* Đã trả */}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
+                        <button className="flex items-center ml-auto hover:text-foreground transition-colors" onClick={() => toggleSort('paidAmount')}>
+                          Đã trả <SortIcon active={billSort.col === 'paidAmount'} dir={billSort.dir} />
+                        </button>
+                      </th>
+                      {/* Trạng thái */}
+                      <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-left">
+                        <button className="flex items-center hover:text-foreground transition-colors" onClick={() => toggleSort('status')}>
+                          Trạng thái <SortIcon active={billSort.col === 'status'} dir={billSort.dir} />
+                        </button>
+                      </th>
                       {showBillActions && isAccountant && (
                         <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-left">
                           Thao tác
@@ -921,17 +1326,21 @@ export default function PeriodDetailPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {bills.map((b, i) => (
+                    {displayBills.map((b, i) => (
                       <tr
                         key={b.id}
                         className="data-row hover:bg-accent/40 transition-colors"
-                        style={i < bills.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
+                        style={i < displayBills.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
                       >
                         <td className="px-4 py-3">
                           <span className="font-mono font-semibold text-primary">{b.customerCode}</span>
                           <span className="text-muted-foreground ml-2">{b.customerName}</span>
                         </td>
                         <td className="px-4 py-3 text-right font-mono">{b.consumption}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs">
+                          {b.unitPrice.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} đ
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(b.serviceFee)}</td>
                         <td className="px-4 py-3 text-right font-mono">{formatCurrency(b.totalAmount)}</td>
                         <td className="px-4 py-3 text-right font-mono">{formatCurrency(b.paidAmount)}</td>
                         <td className="px-4 py-3">
@@ -943,11 +1352,7 @@ export default function PeriodDetailPage() {
                           <td className="px-4 py-3">
                             <div className="flex gap-1 flex-wrap">
                               {['PENDING', 'SENT', 'PARTIAL'].includes(b.status) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openPaymentForm(b)}
-                                >
+                                <Button size="sm" variant="outline" onClick={() => openPaymentForm(b)}>
                                   Ghi thu
                                 </Button>
                               )}
@@ -970,7 +1375,7 @@ export default function PeriodDetailPage() {
 
               {/* Mobile bill cards */}
               <div className="md:hidden divide-y" style={{ borderColor: 'hsl(var(--border) / 0.6)' }}>
-                {bills.map((b) => (
+                {displayBills.map((b) => (
                   <div key={b.id} className="p-4 space-y-2.5">
                     <div className="flex items-start justify-between">
                       <div>
@@ -994,6 +1399,17 @@ export default function PeriodDetailPage() {
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Đã trả</p>
                         <p className="font-mono text-xs font-semibold">{formatCurrency(b.paidAmount)}</p>
                       </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>
+                        Đơn giá: <span className="font-mono text-foreground">
+                          {b.unitPrice.toLocaleString('vi-VN', { maximumFractionDigits: 2 })} đ/kWh
+                        </span>
+                      </span>
+                      <span className="text-border">•</span>
+                      <span>
+                        Phí DV: <span className="font-mono text-foreground">{formatCurrency(b.serviceFee)}</span>
+                      </span>
                     </div>
                     {showBillActions && isAccountant && ['PENDING', 'SENT', 'PARTIAL'].includes(b.status) && (
                       <div className="flex gap-2">
@@ -1191,6 +1607,60 @@ export default function PeriodDetailPage() {
                 {actionLoading === 'addInvoice' ? (
                   <><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</>
                 ) : 'Lưu'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Period dialog ──────────────────────────────────────── */}
+      <Dialog open={editPeriodOpen} onOpenChange={(o) => { if (!o) setEditPeriodOpen(false) }}>
+        <DialogContent title={`Chỉnh sửa — ${period.code}`}>
+          <form onSubmit={handleEditPeriod} className="space-y-3">
+            <div>
+              <Label htmlFor="ep-name">Tên kỳ</Label>
+              <Input
+                id="ep-name"
+                value={editPeriodForm.name ?? ''}
+                onChange={(e) => setEditPeriodForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="ep-svc">Phí ghi điện (đ/hộ)</Label>
+                <Input
+                  id="ep-svc"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={editPeriodForm.serviceFee ?? ''}
+                  onChange={(e) => setEditPeriodForm((f) => ({ ...f, serviceFee: Number(e.target.value) }))}
+                  className="font-mono"
+                />
+              </div>
+              <div>
+                <Label htmlFor="ep-fee">Phụ phí (VND)</Label>
+                <Input
+                  id="ep-fee"
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  value={editPeriodForm.extraFee ?? ''}
+                  onChange={(e) => setEditPeriodForm((f) => ({ ...f, extraFee: Number(e.target.value) }))}
+                  className="font-mono"
+                />
+              </div>
+            </div>
+            {editPeriodError && (
+              <div className="flex items-center gap-2 rounded-md border border-destructive/20 bg-destructive/8 px-3 py-2.5 text-sm text-destructive">
+                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                {editPeriodError}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <Button type="button" variant="outline" onClick={() => setEditPeriodOpen(false)}>Hủy</Button>
+              <Button type="submit" disabled={editPeriodSaving}>
+                {editPeriodSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</> : 'Lưu'}
               </Button>
             </div>
           </form>

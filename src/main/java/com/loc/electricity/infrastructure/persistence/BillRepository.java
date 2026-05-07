@@ -23,6 +23,9 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     void deleteByPeriodId(Long periodId);
 
+    @Query("SELECT COUNT(b) FROM Bill b WHERE b.period.id = :periodId AND b.status NOT IN :paidStatuses")
+    long countUnpaidByPeriodId(@Param("periodId") Long periodId, @Param("paidStatuses") List<BillStatus> paidStatuses);
+
     @Query("SELECT b FROM Bill b JOIN FETCH b.customer JOIN FETCH b.period WHERE b.status IN :statuses ORDER BY b.customer.code")
     List<Bill> findUnpaidBills(@Param("statuses") List<BillStatus> statuses);
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Plus, Pencil, Loader2, AlertCircle } from 'lucide-react'
+import { CalendarDays, Plus, Pencil, Loader2, AlertCircle, AlertTriangle } from 'lucide-react'
 import { periodsApi } from '@/api/periods'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -180,6 +180,12 @@ export default function PeriodsPage() {
       <Dialog open={createOpen} onOpenChange={(o) => { if (!o) setCreateOpen(false) }}>
         <DialogContent title="Tạo kỳ thanh toán mới">
           <form onSubmit={handleCreate} className="space-y-3">
+            {periods.some((p) => !['CLOSED'].includes(p.status)) && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-500/20 bg-amber-500/8 px-3 py-2.5 text-sm text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                <span>Vẫn còn kỳ chưa đóng. Chỉ số đồng hồ kỳ mới sẽ lấy từ lần ghi gần nhất của mỗi hộ.</span>
+              </div>
+            )}
             <div>
               <Label htmlFor="p-name">Tên kỳ *</Label>
               <Input
