@@ -1,10 +1,11 @@
 # Stage 1: Build React frontend
 FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
+RUN npm install -g pnpm
 COPY frontend/package.json ./
-RUN npm install -g npm@11 && npm install
+RUN pnpm install
 COPY frontend/ ./
-RUN npm run build
+RUN pnpm run build
 
 # Stage 2: Build Spring Boot JAR
 FROM maven:3.9-eclipse-temurin-17 AS backend-build
