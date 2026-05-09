@@ -13,6 +13,7 @@ public record BillResponse(
         Long customerId,
         String customerCode,
         String customerName,
+        String customerPhone,
         int consumption,
         BigDecimal unitPrice,
         BigDecimal serviceFee,
@@ -32,6 +33,7 @@ public record BillResponse(
         return new BillResponse(
                 b.getId(), b.getPeriod().getId(), b.getPeriod().getCode(),
                 b.getCustomer().getId(), b.getCustomer().getCode(), b.getCustomer().getFullName(),
+                b.getCustomer().getPhone(),
                 b.getConsumption(), b.getUnitPrice(), b.getServiceFee(),
                 b.getElectricityAmount(), b.getServiceAmount(), b.getTotalAmount(),
                 b.getPaidAmount(), b.getStatus(), b.getPaymentCode(),

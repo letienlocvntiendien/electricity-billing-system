@@ -21,6 +21,7 @@ import com.loc.electricity.infrastructure.persistence.BillingPeriodRepository;
 import com.loc.electricity.infrastructure.persistence.CustomerRepository;
 import com.loc.electricity.infrastructure.persistence.EvnInvoiceRepository;
 import com.loc.electricity.infrastructure.persistence.MeterReadingRepository;
+import com.loc.electricity.infrastructure.persistence.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -44,6 +45,7 @@ public class PeriodService {
     private final CustomerRepository customerRepository;
     private final MeterReadingRepository meterReadingRepository;
     private final BillRepository billRepository;
+    private final PaymentRepository paymentRepository;
     private final EvnInvoiceRepository evnInvoiceRepository;
     private final CalculationEngine calculationEngine;
     private final PeriodWriteGuard periodWriteGuard;
@@ -334,6 +336,7 @@ public class PeriodService {
 
         BillingPeriod before = copyForAudit(period);
 
+        paymentRepository.detachByPeriodId(id);
         billRepository.deleteByPeriodId(id);
 
         period.setUnitPrice(null);

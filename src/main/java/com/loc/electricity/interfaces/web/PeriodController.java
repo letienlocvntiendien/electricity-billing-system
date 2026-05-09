@@ -5,8 +5,11 @@ import com.loc.electricity.application.dto.request.UpdatePeriodRequest;
 import com.loc.electricity.application.dto.response.ApiResponse;
 import com.loc.electricity.application.dto.response.PeriodResponse;
 import com.loc.electricity.application.dto.response.PeriodReviewResponse;
+import com.loc.electricity.application.exception.BusinessException;
+import com.loc.electricity.application.service.BillGenerationService;
 import com.loc.electricity.application.service.PeriodService;
 import com.loc.electricity.domain.period.BillingPeriod;
+import com.loc.electricity.domain.period.PeriodStatus;
 import com.loc.electricity.domain.user.User;
 import com.loc.electricity.infrastructure.pdf.PrintPackService;
 import com.loc.electricity.interfaces.security.CurrentUser;
@@ -30,6 +33,7 @@ public class PeriodController {
 
     private final PeriodService periodService;
     private final PrintPackService printPackService;
+    private final BillGenerationService billGenerationService;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
@@ -128,6 +132,19 @@ public class PeriodController {
             @CurrentUser User currentUser) {
         return ResponseEntity.ok(ApiResponse.ok(
                 PeriodResponse.from(periodService.close(id, currentUser))));
+    }
+
+    @PostMapping("/{id}/generate-bills")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<String>> generateBills(@PathVariable Long id) {
+        BillingPeriod period = periodService.findById(id);
+        if (period.getStatus() != PeriodStatus.APPROVED && period.getStatus() != PeriodStatus.CLOSED) {
+            throw new BusinessException("INVALID_STATUS",
+                    "Chỉ có thể tạo PDF/QR cho kỳ đã APPROVED hoặc CLOSED",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+        billGenerationService.regenerateForPeriod(id);
+        return ResponseEntity.accepted().body(ApiResponse.ok("Đang tạo hóa đơn PDF..."));
     }
 
     @GetMapping("/{id}/print-pack")

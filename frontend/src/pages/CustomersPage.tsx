@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
 import type { CustomerResponse, CreateCustomerRequest, UpdateCustomerRequest } from '@/types/api'
 
 const emptyCreate = (): CreateCustomerRequest => ({
@@ -15,6 +16,7 @@ const emptyCreate = (): CreateCustomerRequest => ({
 
 export default function CustomersPage() {
   const { isAdmin } = useAuth()
+  const toast = useToast()
   const [customers, setCustomers] = useState<CustomerResponse[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -91,7 +93,7 @@ export default function CustomersPage() {
       reload()
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } }
-      alert(e.response?.data?.error ?? 'Không thể xóa.')
+      toast.error(e.response?.data?.error ?? 'Không thể xóa.')
     }
   }
 

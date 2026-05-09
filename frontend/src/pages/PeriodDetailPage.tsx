@@ -1,10 +1,11 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle, Pencil, Info, AlertCircle, Search, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle, Pencil, Info, AlertCircle, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Clock, MessageSquare } from 'lucide-react'
 import { periodsApi } from '@/api/periods'
 import { readingsApi } from '@/api/readings'
 import { billsApi } from '@/api/bills'
 import { useAuth } from '@/context/AuthContext'
+import { useToast } from '@/context/ToastContext'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,7 @@ import { periodStatusLabel, periodStatusVariant, billStatusLabel, billStatusVari
 import type {
   PeriodResponse, BillResponse, MeterReadingResponse,
   EvnInvoiceResponse, PaymentMethod, PeriodReviewResponse, UpdatePeriodRequest, BillStatus,
+  PaymentResponse, SmsResultResponse,
 } from '@/types/api'
 
 type Tab = 'invoices' | 'readings' | 'bills'
@@ -59,6 +61,7 @@ function ReviewRow({ label, value, highlight }: { label: string; value: string; 
 export default function PeriodDetailPage() {
   const { id } = useParams<{ id: string }>()
   const { user, isAdmin, isAccountant } = useAuth()
+  const toast = useToast()
   const periodId = Number(id)
 
   const [period, setPeriod] = useState<PeriodResponse | null>(null)
@@ -68,6 +71,9 @@ export default function PeriodDetailPage() {
   const [tab, setTab] = useState<Tab>('readings')
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
+  const genPollerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [readingInputs, setReadingInputs] = useState<Record<number, string>>({})
   const [submittingId, setSubmittingId] = useState<number | null>(null)
@@ -75,12 +81,19 @@ export default function PeriodDetailPage() {
 
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false)
   const [paymentBill, setPaymentBill] = useState<BillResponse | null>(null)
+
+  const [historyBill, setHistoryBill] = useState<BillResponse | null>(null)
+  const [historyPayments, setHistoryPayments] = useState<PaymentResponse[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewData, setReviewData] = useState<PeriodReviewResponse | null>(null)
   const [reviewLoading, setReviewLoading] = useState(false)
 
   const [editingReadingId, setEditingReadingId] = useState<number | null>(null)
   const [editReadingInput, setEditReadingInput] = useState('')
+
+  const [selectedBillIds, setSelectedBillIds] = useState<Set<number>>(new Set())
+  const [sendingSms, setSendingSms] = useState(false)
   const [editPeriodOpen, setEditPeriodOpen] = useState(false)
   const [editPeriodForm, setEditPeriodForm] = useState<UpdatePeriodRequest>({})
   const [editPeriodSaving, setEditPeriodSaving] = useState(false)
@@ -123,6 +136,10 @@ export default function PeriodDetailPage() {
   }, [loadData])
 
   useEffect(() => {
+    return () => { if (genPollerRef.current) clearInterval(genPollerRef.current) }
+  }, [])
+
+  useEffect(() => {
     if (recentlyDoneId === null) return
     const t = setTimeout(() => setRecentlyDoneId(null), 1200)
     return () => clearTimeout(t)
@@ -159,7 +176,7 @@ export default function PeriodDetailPage() {
         setReadings(newReadings)
       }
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi thực hiện.'))
+      toast.error(apiError(e, 'Lỗi thực hiện.'))
     } finally {
       setActionLoading(null)
     }
@@ -184,7 +201,7 @@ export default function PeriodDetailPage() {
       setAddInvoiceOpen(false)
       setInvoiceForm({ invoiceDate: '', invoiceNumber: '', kwh: '', amount: '' })
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi thêm hóa đơn EVN.'))
+      toast.error(apiError(e, 'Lỗi thêm hóa đơn EVN.'))
     } finally {
       setActionLoading(null)
     }
@@ -201,7 +218,7 @@ export default function PeriodDetailPage() {
       setPeriod(updatedPeriod)
       setInvoices(newInvoices)
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi xóa.'))
+      toast.error(apiError(e, 'Lỗi xóa.'))
     }
   }
 
@@ -209,7 +226,7 @@ export default function PeriodDetailPage() {
     const val = readingInputs[reading.id]
     const currentIndex = Number(val)
     if (!val || isNaN(currentIndex) || currentIndex < reading.previousIndex) {
-      alert('Chỉ số mới phải ≥ chỉ số cũ.')
+      toast.warning('Chỉ số mới phải ≥ chỉ số cũ.')
       return
     }
     setSubmittingId(reading.id)
@@ -220,7 +237,7 @@ export default function PeriodDetailPage() {
       setReadingInputs((prev) => { const n = { ...prev }; delete n[reading.id]; return n })
       setRecentlyDoneId(reading.id)
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi ghi chỉ số.'))
+      toast.error(apiError(e, 'Lỗi ghi chỉ số.'))
     } finally {
       setSubmittingId(null)
     }
@@ -229,7 +246,7 @@ export default function PeriodDetailPage() {
   async function handleEditReading(reading: MeterReadingResponse) {
     const currentIndex = Number(editReadingInput)
     if (!editReadingInput || isNaN(currentIndex) || currentIndex < reading.previousIndex) {
-      alert('Chỉ số mới phải ≥ chỉ số cũ.')
+      toast.warning('Chỉ số mới phải ≥ chỉ số cũ.')
       return
     }
     setSubmittingId(reading.id)
@@ -239,7 +256,7 @@ export default function PeriodDetailPage() {
       setEditingReadingId(null)
       setEditReadingInput('')
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi sửa chỉ số.'))
+      toast.error(apiError(e, 'Lỗi sửa chỉ số.'))
     } finally {
       setSubmittingId(null)
     }
@@ -269,7 +286,7 @@ export default function PeriodDetailPage() {
       const data = await periodsApi.review(periodId)
       setReviewData(data)
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi tải dữ liệu đối chiếu.'))
+      toast.error(apiError(e, 'Lỗi tải dữ liệu đối chiếu.'))
       setReviewOpen(false)
     } finally {
       setReviewLoading(false)
@@ -283,7 +300,7 @@ export default function PeriodDetailPage() {
       const updated = await periodsApi.submitReadings(periodId)
       setPeriod(updated)
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi nộp kỳ.'))
+      toast.error(apiError(e, 'Lỗi nộp kỳ.'))
     } finally {
       setActionLoading(null)
     }
@@ -318,7 +335,7 @@ export default function PeriodDetailPage() {
       setPaymentBill(null)
       setPaymentForm({ amount: '', method: 'CASH', paidAt: nowLocalDatetime(), notes: '' })
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi ghi thu.'))
+      toast.error(apiError(e, 'Lỗi ghi thu.'))
     } finally {
       setActionLoading(null)
     }
@@ -329,7 +346,7 @@ export default function PeriodDetailPage() {
       const updated = await billsApi.markSent(bill.id)
       setBills((prev) => prev.map((b) => (b.id === updated.id ? updated : b)))
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi đánh dấu.'))
+      toast.error(apiError(e, 'Lỗi đánh dấu.'))
     }
   }
 
@@ -337,10 +354,97 @@ export default function PeriodDetailPage() {
     try {
       const url = await billsApi.zaloLink(bill.id)
       if (url) window.open(url, '_blank')
-      else alert('Khách hàng không có Zalo hoặc chưa cấu hình QR.')
+      else toast.info('Khách hàng không có Zalo hoặc chưa cấu hình QR.')
     } catch (e: unknown) {
-      alert(apiError(e, 'Lỗi lấy link Zalo.'))
+      toast.error(apiError(e, 'Lỗi lấy link Zalo.'))
     }
+  }
+
+  async function handleSendSms() {
+    if (selectedBillIds.size === 0) return
+    setSendingSms(true)
+    try {
+      const results: SmsResultResponse[] = await billsApi.sendSms(Array.from(selectedBillIds))
+      const success = results.filter((r) => r.success).length
+      const failed = results.length - success
+      if (failed === 0) {
+        toast.success(`Đã gửi SMS thành công cho ${success} khách hàng.`)
+      } else {
+        toast.info(`Gửi thành công ${success}/${results.length}. Thất bại ${failed} (không có SĐT hoặc chưa có QR).`)
+      }
+      setSelectedBillIds(new Set())
+    } catch (e: unknown) {
+      toast.error(apiError(e, 'Lỗi gửi SMS.'))
+    } finally {
+      setSendingSms(false)
+    }
+  }
+
+  async function handleViewPdf(bill: BillResponse) {
+    try {
+      const objectUrl = await billsApi.getPdf(bill.id)
+      window.open(objectUrl, '_blank')
+    } catch (e: unknown) {
+      toast.error(apiError(e, 'Lỗi tải PDF.'))
+    }
+  }
+
+  async function openPaymentHistory(bill: BillResponse) {
+    setHistoryBill(bill)
+    setHistoryPayments([])
+    setHistoryLoading(true)
+    try {
+      const payments = await billsApi.listPayments(bill.id)
+      setHistoryPayments(payments)
+    } catch {
+      toast.error('Không thể tải lịch sử thanh toán.')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  async function handleGenerateBills() {
+    const total = bills.length
+    if (total === 0) { toast.warning('Không có hóa đơn nào để tạo.'); return }
+
+    setGenerating(true)
+    setGenProgress({ done: 0, total })
+
+    try {
+      await periodsApi.generateBills(periodId)
+    } catch (e: unknown) {
+      toast.error(apiError(e, 'Lỗi tạo hóa đơn.'))
+      setGenerating(false)
+      return
+    }
+
+    let attempts = 0
+    genPollerRef.current = setInterval(async () => {
+      attempts++
+      try {
+        const updated = await periodsApi.listBills(periodId)
+        const done = updated.filter((b) => b.qrCodeUrl != null && b.pdfUrl != null).length
+        setGenProgress({ done, total: updated.length })
+
+        if (done >= updated.length || attempts >= 180) {
+          clearInterval(genPollerRef.current!)
+          genPollerRef.current = null
+          setBills(updated)
+          setGenerating(false)
+          if (done >= updated.length) {
+            toast.success(`Đã tạo ${done} hóa đơn PDF & QR thành công!`)
+          } else {
+            toast.warning(`Hoàn thành ${done}/${updated.length}. Một số hóa đơn có thể thất bại.`)
+          }
+        }
+      } catch { /* ignore poll errors */ }
+    }, 1000)
+  }
+
+  function cancelGeneration() {
+    if (genPollerRef.current) { clearInterval(genPollerRef.current); genPollerRef.current = null }
+    setGenerating(false)
+    toast.info('Đã ẩn. Hóa đơn vẫn đang tạo ở nền.')
   }
 
   const displayBills = useMemo(() => {
@@ -569,7 +673,8 @@ export default function PeriodDetailPage() {
       {(canAddInvoice ||
         period.status === 'READING_DONE' ||
         period.status === 'CALCULATED' ||
-        period.status === 'APPROVED') && (
+        period.status === 'APPROVED' ||
+        (period.status === 'CLOSED' && isAdmin)) && (
         <div className="flex flex-wrap gap-2 rounded-lg border p-3 bg-muted/20">
           {canAddInvoice && (
             <Button size="sm" onClick={() => setAddInvoiceOpen(true)}>
@@ -649,6 +754,13 @@ export default function PeriodDetailPage() {
             <>
               <Button
                 size="sm"
+                variant="outline"
+                onClick={handleGenerateBills}
+              >
+                Tạo PDF & QR
+              </Button>
+              <Button
+                size="sm"
                 variant="destructive"
                 disabled={actionLoading === 'revert'}
                 onClick={() => handleAction('revert')}
@@ -664,6 +776,15 @@ export default function PeriodDetailPage() {
                 {actionLoading === 'close' ? 'Đang đóng...' : 'Đóng kỳ'}
               </Button>
             </>
+          )}
+          {period.status === 'CLOSED' && isAdmin && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleGenerateBills}
+            >
+              Tạo PDF & QR
+            </Button>
           )}
         </div>
       )}
@@ -947,9 +1068,13 @@ export default function PeriodDetailPage() {
                               {new Date(r.readAt).toLocaleString('vi-VN')}
                             </span>
                             {r.warning && (
-                              <span className="flex items-center gap-1 text-amber-400 text-xs font-medium">
-                                <AlertTriangle className="h-3 w-3" /> Bất thường
-                              </span>
+                              <div
+                                className="flex items-center gap-1 mt-0.5 rounded px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 max-w-[200px]"
+                                title={r.warning}
+                              >
+                                <AlertTriangle className="h-3 w-3 flex-shrink-0 text-amber-400" />
+                                <span className="text-xs text-amber-400 truncate">{r.warning}</span>
+                              </div>
                             )}
                           </div>
                         ) : (
@@ -1222,11 +1347,21 @@ export default function PeriodDetailPage() {
           <div className="px-5 pt-4 pb-3 space-y-2.5" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold">Hóa đơn khách hàng</span>
-              {(billSearch || billStatusFilter !== 'ALL') && (
-                <span className="text-xs text-muted-foreground flex-shrink-0">
-                  {displayBills.length}/{bills.length} hóa đơn
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {(billSearch || billStatusFilter !== 'ALL') && (
+                  <span className="text-xs text-muted-foreground flex-shrink-0">
+                    {displayBills.length}/{bills.length} hóa đơn
+                  </span>
+                )}
+                {showBillActions && isAccountant && selectedBillIds.size > 0 && (
+                  <Button size="sm" variant="outline" onClick={handleSendSms} disabled={sendingSms}>
+                    {sendingSms
+                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Đang gửi...</>
+                      : <><MessageSquare className="h-3.5 w-3.5" /> Gửi SMS ({selectedBillIds.size})</>
+                    }
+                  </Button>
+                )}
+              </div>
             </div>
             {bills.length > 0 && (
               <div className="flex flex-wrap gap-2">
@@ -1276,6 +1411,23 @@ export default function PeriodDetailPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: '1px solid hsl(var(--border))' }}>
+                      {showBillActions && isAccountant && (
+                        <th className="px-3 py-3 w-8">
+                          <input
+                            type="checkbox"
+                            className="rounded border-border cursor-pointer"
+                            title="Chọn tất cả có thể gửi SMS"
+                            checked={displayBills.filter(b => b.customerPhone && b.qrCodeUrl).every(b => selectedBillIds.has(b.id)) && displayBills.some(b => b.customerPhone && b.qrCodeUrl)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedBillIds(new Set(displayBills.filter(b => b.customerPhone && b.qrCodeUrl).map(b => b.id)))
+                              } else {
+                                setSelectedBillIds(new Set())
+                              }
+                            }}
+                          />
+                        </th>
+                      )}
                       {/* Khách hàng — sortable */}
                       <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-left">
                         <button className="flex items-center hover:text-foreground transition-colors" onClick={() => toggleSort('customerCode')}>
@@ -1332,6 +1484,25 @@ export default function PeriodDetailPage() {
                         className="data-row hover:bg-accent/40 transition-colors"
                         style={i < displayBills.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
                       >
+                        {showBillActions && isAccountant && (
+                          <td className="px-3 py-3 w-8">
+                            <input
+                              type="checkbox"
+                              className="rounded border-border cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                              disabled={!b.customerPhone || !b.qrCodeUrl}
+                              title={!b.customerPhone ? 'Khách hàng chưa có SĐT' : !b.qrCodeUrl ? 'Chưa có mã QR' : ''}
+                              checked={selectedBillIds.has(b.id)}
+                              onChange={(e) => {
+                                setSelectedBillIds((prev) => {
+                                  const next = new Set(prev)
+                                  if (e.target.checked) next.add(b.id)
+                                  else next.delete(b.id)
+                                  return next
+                                })
+                              }}
+                            />
+                          </td>
+                        )}
                         <td className="px-4 py-3">
                           <span className="font-mono font-semibold text-primary">{b.customerCode}</span>
                           <span className="text-muted-foreground ml-2">{b.customerName}</span>
@@ -1356,6 +1527,9 @@ export default function PeriodDetailPage() {
                                   Ghi thu
                                 </Button>
                               )}
+                              <Button size="sm" variant="ghost" title="Lịch sử thanh toán" onClick={() => openPaymentHistory(b)}>
+                                <Clock className="h-3.5 w-3.5" />
+                              </Button>
                               {b.status === 'PENDING' && (
                                 <Button size="sm" variant="ghost" onClick={() => handleMarkSent(b)}>
                                   Gửi
@@ -1363,6 +1537,24 @@ export default function PeriodDetailPage() {
                               )}
                               <Button size="sm" variant="ghost" onClick={() => handleZaloLink(b)}>
                                 Zalo
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!b.qrCodeUrl}
+                                title={b.qrCodeUrl ? 'Xem mã QR' : 'Chưa có mã QR'}
+                                onClick={() => b.qrCodeUrl && window.open(b.qrCodeUrl, '_blank')}
+                              >
+                                QR
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!b.pdfUrl}
+                                title={b.pdfUrl ? 'Xem hóa đơn PDF' : 'Chưa có PDF'}
+                                onClick={() => handleViewPdf(b)}
+                              >
+                                PDF
                               </Button>
                             </div>
                           </td>
@@ -1411,6 +1603,11 @@ export default function PeriodDetailPage() {
                         Phí DV: <span className="font-mono text-foreground">{formatCurrency(b.serviceFee)}</span>
                       </span>
                     </div>
+                    {showBillActions && isAccountant && (
+                      <Button size="sm" variant="ghost" className="w-full" onClick={() => openPaymentHistory(b)}>
+                        <Clock className="h-3.5 w-3.5 mr-1" /> Lịch sử thanh toán
+                      </Button>
+                    )}
                     {showBillActions && isAccountant && ['PENDING', 'SENT', 'PARTIAL'].includes(b.status) && (
                       <div className="flex gap-2">
                         <Button
@@ -1436,6 +1633,24 @@ export default function PeriodDetailPage() {
                         )}
                         <Button size="sm" variant="ghost" onClick={() => handleZaloLink(b)}>
                           Zalo
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={!b.qrCodeUrl}
+                          title={b.qrCodeUrl ? 'Xem mã QR' : 'Chưa có mã QR'}
+                          onClick={() => b.qrCodeUrl && window.open(b.qrCodeUrl, '_blank')}
+                        >
+                          QR
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={!b.pdfUrl}
+                          title={b.pdfUrl ? 'Xem hóa đơn PDF' : 'Chưa có PDF'}
+                          onClick={() => handleViewPdf(b)}
+                        >
+                          PDF
                         </Button>
                       </div>
                     )}
@@ -1735,6 +1950,128 @@ export default function PeriodDetailPage() {
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── PDF/QR Generation Progress Dialog ───────────────────────── */}
+      <Dialog open={generating} onOpenChange={(open) => { if (!open) cancelGeneration() }}>
+        <DialogContent title="Đang tạo hóa đơn">
+          <div className="space-y-6 py-2">
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative flex items-center justify-center h-16 w-16">
+                <div className="absolute inset-0 rounded-full bg-amber-400/10 animate-ping" />
+                <div className="relative h-14 w-14 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+                  <Zap className="h-7 w-7 text-amber-400 animate-pulse" />
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground text-center">
+                Đang tạo PDF và mã QR VietQR cho từng hộ...
+              </p>
+            </div>
+
+            <div className="text-center">
+              <div className="font-mono tabular-nums">
+                <span className="text-4xl font-bold text-foreground">{genProgress.done}</span>
+                <span className="text-2xl text-muted-foreground"> / {genProgress.total}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">hóa đơn đã hoàn thành</p>
+            </div>
+
+            <div className="space-y-1">
+              <div className="h-2 rounded-full bg-border overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-amber-400 transition-all duration-500 ease-out"
+                  style={{
+                    width: genProgress.total > 0
+                      ? `${Math.round((genProgress.done / genProgress.total) * 100)}%`
+                      : '0%',
+                    boxShadow: '0 0 10px rgba(251,191,36,0.6)',
+                  }}
+                />
+              </div>
+              <p className="text-right text-xs font-mono text-muted-foreground">
+                {genProgress.total > 0
+                  ? `${Math.round((genProgress.done / genProgress.total) * 100)}%`
+                  : '0%'}
+              </p>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground hover:text-foreground"
+              onClick={cancelGeneration}
+            >
+              Ẩn (tiếp tục ở nền)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Payment History Dialog ────────────────────────────────────── */}
+      <Dialog open={historyBill !== null} onOpenChange={(open) => { if (!open) setHistoryBill(null) }}>
+        <DialogContent title={`Lịch sử thanh toán — ${historyBill?.customerCode ?? ''}`}>
+          {historyLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : historyPayments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-2">
+              <Clock className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">Chưa có thanh toán nào</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+              {historyPayments.map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg px-3 py-2.5 space-y-1.5"
+                  style={{ border: '1px solid hsl(var(--border))', background: 'hsl(var(--accent) / 0.3)' }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-emerald-400 font-mono">
+                      {formatCurrency(p.amount)}
+                    </span>
+                    <span className={cn(
+                      'text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide',
+                      p.method === 'BANK_TRANSFER'
+                        ? 'bg-sky-500/15 text-sky-400'
+                        : p.method === 'CASH'
+                        ? 'bg-emerald-500/15 text-emerald-400'
+                        : 'bg-muted/50 text-muted-foreground',
+                    )}>
+                      {methodLabel[p.method]}
+                      {p.bankTransactionId ? ' · SePay' : ''}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(p.paidAt).toLocaleString('vi-VN', {
+                      day: '2-digit', month: '2-digit', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit',
+                    })}
+                  </div>
+                  {p.bankTransactionId && (
+                    <div className="text-xs font-mono text-muted-foreground/70">
+                      Mã GD: {p.bankTransactionId}
+                      {p.bankReferenceCode && ` · Ref: ${p.bankReferenceCode}`}
+                    </div>
+                  )}
+                  {p.notes && (
+                    <div className="text-xs text-foreground/70 italic">"{p.notes}"</div>
+                  )}
+                </div>
+              ))}
+              <div
+                className="sticky bottom-0 pt-1 flex justify-between text-xs text-muted-foreground px-1"
+                style={{ background: 'hsl(var(--background))' }}
+              >
+                <span>{historyPayments.length} giao dịch</span>
+                <span className="font-mono font-semibold text-foreground">
+                  Tổng: {formatCurrency(historyPayments.reduce((s, p) => s + p.amount, 0))}
+                </span>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

@@ -209,3 +209,20 @@
 .reading-card-done {
   animation: reading-done 0.25s ease-out both;
 }
+
+/* ── Toast notifications ─────────────────────────────────────────────────── */
+
+@keyframes toast-in {
+  from { transform: translateX(calc(100% + 1.5rem)); opacity: 0; }
+  to   { transform: translateX(0);                   opacity: 1; }
+}
+
+@keyframes toast-out {
+  from { transform: translateX(0);                   opacity: 1; }
+  to   { transform: translateX(calc(100% + 1.5rem)); opacity: 0; }
+}
+
+@layer utilities {
+  .animate-toast-in  { animation: toast-in  0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .animate-toast-out { animation: toast-out 0.22s ease-in both; }
+}

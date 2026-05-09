@@ -19,7 +19,7 @@ public record MeterReadingResponse(
         String warning
 ) {
     public static MeterReadingResponse from(MeterReading r) {
-        return from(r, null);
+        return from(r, r.getWarning());
     }
 
     public static MeterReadingResponse from(MeterReading r, String warning) {

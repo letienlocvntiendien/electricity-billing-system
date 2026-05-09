@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Plus, Pencil, Loader2, AlertCircle, AlertTriangle } from 'lucide-react'
+import { CalendarDays, Plus, Pencil, Loader2, AlertCircle, AlertTriangle, ChevronRight } from 'lucide-react'
 import { periodsApi } from '@/api/periods'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -100,7 +100,11 @@ export default function PeriodsPage() {
           </div>
         </div>
         {isAdmin && (
-          <Button size="sm" onClick={openCreate}>
+          <Button
+            size="sm"
+            onClick={openCreate}
+            className="shadow-[0_0_0_1px_hsl(var(--primary)/0.3)] hover:shadow-[0_0_14px_hsl(var(--primary)/0.35)] transition-shadow duration-300"
+          >
             <Plus className="h-4 w-4" /> Tạo kỳ mới
           </Button>
         )}
@@ -129,15 +133,16 @@ export default function PeriodsPage() {
                 {periods.map((p, i) => (
                   <tr
                     key={p.id}
-                    className="data-row hover:bg-accent/40 transition-colors"
+                    className={`data-row hover:bg-accent/40 transition-colors ${p.status === 'CLOSED' ? 'opacity-55' : ''}`}
                     style={i < periods.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
                   >
                     <td className="px-4 py-3">
                       <Link
                         to={`/periods/${p.id}`}
-                        className="font-medium text-primary hover:text-primary/80 transition-colors"
+                        className="group/link inline-flex items-center gap-0.5 font-semibold text-primary hover:text-primary/80 transition-colors"
                       >
                         {p.name}
+                        <ChevronRight className="h-3.5 w-3.5 opacity-0 -translate-x-1 group-hover/link:opacity-100 group-hover/link:translate-x-0 transition-all duration-150" />
                       </Link>
                       <span className="font-mono text-[11px] text-muted-foreground ml-2">{p.code}</span>
                     </td>
@@ -152,6 +157,7 @@ export default function PeriodsPage() {
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={periodStatusVariant[p.status]}>
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-current mr-1 flex-shrink-0" />
                         {periodStatusLabel[p.status]}
                       </Badge>
                     </td>
@@ -160,7 +166,7 @@ export default function PeriodsPage() {
                         {!LOCKED.has(p.status) && (
                           <button
                             onClick={() => openEdit(p)}
-                            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors ml-auto"
+                            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 hover:scale-110 active:scale-95 transition-all duration-150 ml-auto"
                             title="Chỉnh sửa"
                           >
                             <Pencil className="h-3.5 w-3.5" />

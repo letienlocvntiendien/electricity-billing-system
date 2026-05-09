@@ -54,6 +54,9 @@ public class MeterReading {
     @JoinColumn(name = "read_by")
     private User readBy;
 
+    @Column(name = "warning", length = 500)
+    private String warning;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

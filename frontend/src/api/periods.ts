@@ -71,4 +71,7 @@ export const periodsApi = {
   // Print pack
   printPack: (id: number) =>
     client.get(`/periods/${id}/print-pack`, { responseType: 'blob' }),
+
+  generateBills: (id: number) =>
+    client.post<ApiResponse<string>>(`/periods/${id}/generate-bills`).then((r) => r.data),
 }
