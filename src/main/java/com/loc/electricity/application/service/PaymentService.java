@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +33,10 @@ public class PaymentService {
 
     public Page<Payment> findUnmatched(Pageable pageable) {
         return paymentRepository.findByBillIdIsNull(pageable);
+    }
+
+    public List<Payment> findByBillId(Long billId) {
+        return paymentRepository.findByBillIdOrderByPaidAtDesc(billId);
     }
 
     public Payment findById(Long id) {

@@ -20,7 +20,7 @@ public class VietQrService {
     /** Builds a VietQR image URL for the given payment code and amount. */
     public String buildQrUrl(String paymentCode, BigDecimal amount) {
         // Read bank settings fresh each call — admin can update without restart
-        String bankBin = systemSettingService.getValue("bank_bin");
+        String bankBin = systemSettingService.getValue("bank_bin_tpbank");
         String accountNumber = systemSettingService.getValue("bank_account_number");
         String accountHolder = systemSettingService.getValue("bank_account_holder");
 

@@ -66,6 +66,8 @@ public class MeterReadingService {
         reading = meterReadingRepository.save(reading);
 
         String warning = checkAnomaly(reading);
+        reading.setWarning(warning);
+        reading = meterReadingRepository.save(reading);
 
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.UPDATE_METER_READING,
                 "MeterReading", reading.getId(), before, reading, submittedBy));

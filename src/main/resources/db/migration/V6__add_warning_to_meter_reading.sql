@@ -1,0 +1,2 @@
+ALTER TABLE meter_reading
+    ADD COLUMN warning VARCHAR(500) DEFAULT NULL;

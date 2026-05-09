@@ -143,6 +143,7 @@ export interface BillResponse {
   customerId: number
   customerCode: string
   customerName: string
+  customerPhone: string | null
   consumption: number
   unitPrice: number
   serviceFee: number
@@ -157,6 +158,15 @@ export interface BillResponse {
   sentViaZalo: boolean
   sentAt: string | null
   createdAt: string
+}
+
+export interface SmsResultResponse {
+  billId: number
+  customerCode: string
+  customerName: string
+  phone: string | null
+  success: boolean
+  errorMessage: string | null
 }
 
 // ── Payment ───────────────────────────────────────────────────────────────────

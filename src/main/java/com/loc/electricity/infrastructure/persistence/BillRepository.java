@@ -34,4 +34,7 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     int markOverdue(@Param("overdueStatus") BillStatus overdueStatus,
                     @Param("statuses") List<BillStatus> statuses,
                     @Param("cutoff") LocalDateTime cutoff);
+
+    @Query("SELECT b FROM Bill b JOIN FETCH b.customer JOIN FETCH b.period WHERE b.id IN :ids")
+    List<Bill> findAllByIdIn(@Param("ids") List<Long> ids);
 }

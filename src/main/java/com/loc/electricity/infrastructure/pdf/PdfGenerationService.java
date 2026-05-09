@@ -123,8 +123,14 @@ public class PdfGenerationService {
 
             // QR code
             if (qrUrl != null) {
-                try (InputStream is = URI.create(qrUrl).toURL().openStream()) {
-                    byte[] imgBytes = is.readAllBytes();
+                try {
+                    java.net.URLConnection conn = URI.create(qrUrl).toURL().openConnection();
+                    conn.setConnectTimeout(5_000);
+                    conn.setReadTimeout(8_000);
+                    byte[] imgBytes;
+                    try (InputStream is = conn.getInputStream()) {
+                        imgBytes = is.readAllBytes();
+                    }
                     Image qr = Image.getInstance(imgBytes);
                     qr.scaleToFit(100f, 100f);
                     qr.setAlignment(Image.ALIGN_CENTER);

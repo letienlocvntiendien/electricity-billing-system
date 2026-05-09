@@ -31,7 +31,15 @@ public class BillGenerationService {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onPeriodApproved(PeriodApprovedEvent event) {
-        Long periodId = event.getPeriodId();
+        doGenerate(event.getPeriodId());
+    }
+
+    @Async("pdfTaskExecutor")
+    public void regenerateForPeriod(Long periodId) {
+        doGenerate(periodId);
+    }
+
+    private void doGenerate(Long periodId) {
         log.info("Starting bill PDF generation for period {}", periodId);
 
         List<Bill> bills = billRepository.findAllByPeriodId(periodId);
