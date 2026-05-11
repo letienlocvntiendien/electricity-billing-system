@@ -5,10 +5,14 @@ import com.loc.electricity.application.dto.request.UpdateCustomerRequest;
 import com.loc.electricity.application.exception.BusinessException;
 import com.loc.electricity.application.exception.ResourceNotFoundException;
 import com.loc.electricity.domain.customer.Customer;
+import com.loc.electricity.domain.period.PeriodStatus;
+import com.loc.electricity.domain.reading.MeterReading;
 import com.loc.electricity.domain.shared.AuditAction;
 import com.loc.electricity.domain.shared.AuditEvent;
 import com.loc.electricity.domain.user.User;
+import com.loc.electricity.infrastructure.persistence.BillingPeriodRepository;
 import com.loc.electricity.infrastructure.persistence.CustomerRepository;
+import com.loc.electricity.infrastructure.persistence.MeterReadingRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -24,6 +28,8 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final BillingPeriodRepository billingPeriodRepository;
+    private final MeterReadingRepository meterReadingRepository;
 
     public Page<Customer> findAll(Boolean active, Pageable pageable) {
         if (active != null) {
@@ -57,6 +63,8 @@ public class CustomerService {
         customer = customerRepository.save(customer);
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.CREATE_CUSTOMER,
                 "Customer", customer.getId(), null, customer, createdBy));
+
+        addReadingToOpenPeriod(customer);
         return customer;
     }
 
@@ -64,6 +72,9 @@ public class CustomerService {
     public Customer update(Long id, UpdateCustomerRequest request, User updatedBy) {
         Customer customer = findById(id);
         Customer before = copyOf(customer);
+
+        boolean wasActive   = customer.isActive();
+        boolean wasInactive = !customer.isActive();
 
         if (request.fullName() != null) customer.setFullName(request.fullName());
         if (request.phone() != null) customer.setPhone(request.phone());
@@ -75,6 +86,13 @@ public class CustomerService {
         customer = customerRepository.save(customer);
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.UPDATE_CUSTOMER,
                 "Customer", customer.getId(), before, customer, updatedBy));
+
+        if (wasInactive && Boolean.TRUE.equals(request.active())) {
+            addReadingToOpenPeriod(customer);
+        } else if (wasActive && Boolean.FALSE.equals(request.active())) {
+            removeUnsubmittedReadingFromOpenPeriod(customer);
+        }
+
         return customer;
     }
 
@@ -86,10 +104,51 @@ public class CustomerService {
         customerRepository.save(customer);
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.DELETE_CUSTOMER,
                 "Customer", id, before, customer, deletedBy));
+
+        removeUnsubmittedReadingFromOpenPeriod(customer);
     }
 
     public List<Customer> findAllActive() {
         return customerRepository.findAllByActiveTrue();
+    }
+
+    // Tạo MeterReading cho kỳ OPEN nếu chưa có (dùng khi thêm mới hoặc reactivate)
+    private void addReadingToOpenPeriod(Customer customer) {
+        billingPeriodRepository
+                .findFirstByStatusInOrderByStartDateDesc(List.of(PeriodStatus.OPEN))
+                .ifPresent(openPeriod -> {
+                    if (meterReadingRepository
+                            .findByPeriodIdAndCustomerId(openPeriod.getId(), customer.getId())
+                            .isPresent()) return;
+
+                    int previousIndex = meterReadingRepository
+                            .findLatestSubmittedByCustomerId(customer.getId())
+                            .map(MeterReading::getCurrentIndex)
+                            .orElse(0);
+
+                    meterReadingRepository.save(MeterReading.builder()
+                            .period(openPeriod)
+                            .customer(customer)
+                            .previousIndex(previousIndex)
+                            .currentIndex(previousIndex)
+                            .build());
+                });
+    }
+
+    // Xóa MeterReading chưa submit của kỳ OPEN (dùng khi deactivate)
+    // Reading đã submit (readAt != null) được giữ nguyên để bảo toàn dữ liệu
+    private void removeUnsubmittedReadingFromOpenPeriod(Customer customer) {
+        billingPeriodRepository
+                .findFirstByStatusInOrderByStartDateDesc(List.of(PeriodStatus.OPEN))
+                .ifPresent(openPeriod ->
+                        meterReadingRepository
+                                .findByPeriodIdAndCustomerId(openPeriod.getId(), customer.getId())
+                                .ifPresent(reading -> {
+                                    if (reading.getReadAt() == null) {
+                                        meterReadingRepository.delete(reading);
+                                    }
+                                })
+                );
     }
 
     private Customer copyOf(Customer c) {
