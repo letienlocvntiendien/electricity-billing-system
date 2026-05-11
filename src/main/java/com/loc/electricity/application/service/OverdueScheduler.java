@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
-@Profile("!dev")
+@Profile("!dev & !local")
 @RequiredArgsConstructor
 @Slf4j
 public class OverdueScheduler {

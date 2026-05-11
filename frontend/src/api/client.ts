@@ -12,11 +12,13 @@ client.interceptors.request.use((config) => {
   return config
 })
 
-// On 401, clear tokens and redirect to login
+// On 401, clear tokens and redirect to login.
+// Skip redirect for auth endpoints — login failure should show error in UI, not redirect.
 client.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    const isAuthEndpoint = error.config?.url?.includes('/auth/')
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
       window.location.href = '/login'
