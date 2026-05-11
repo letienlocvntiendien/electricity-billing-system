@@ -40,7 +40,7 @@ import java.util.List;
  *   reader      / Reader@123
  */
 @Component
-@Profile("dev")
+@Profile("dev | local")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements ApplicationRunner {

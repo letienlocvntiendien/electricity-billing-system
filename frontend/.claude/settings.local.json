@@ -7,7 +7,19 @@
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\frontend\\\\src\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName } | Sort-Object)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\" -Recurse -Name)",
       "Bash(./mvnw compile *)",
-      "Bash(cmd /c \"mvnw.cmd compile -q 2>&1\")"
+      "Bash(cmd /c \"mvnw.cmd compile -q 2>&1\")",
+      "Bash(Get-ChildItem *)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(Test-Path C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\resources\\\\static\\\\\" && echo static *)",
+      "PowerShell(head *)",
+      "Bash(./mvnw dependency:list -q)",
+      "Bash(./mvnw dependency:list)",
+      "Bash(findstr /i \"spring-boot\")",
+      "Bash(findstr /v \"test\")",
+      "Bash(head /n 20)",
+      "Bash(./mvnw dependency:unpack -Dartifact=org.springframework.boot:spring-boot-servlet:4.0.0:jar -DoutputDirectory=target/tmp-inspect)",
+      "Bash(jar tf *)",
+      "Bash(./mvnw test *)"
     ]
   }
 }

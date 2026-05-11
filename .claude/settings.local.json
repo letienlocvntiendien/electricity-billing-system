@@ -48,7 +48,20 @@
       "PowerShell(Get-Command *)",
       "Skill(update-config)",
       "Bash(Get-ChildItem *)",
-      "Bash(grep -E \"\\\\.java$\")"
+      "Bash(grep -E \"\\\\.java$\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(Select-Object Name)",
+      "Bash(Test-Path C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\frontend\\\\dist *)",
+      "Bash(Select-Object -First 20)",
+      "Bash(./mvnw clean *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\frontend\\\\src\\\\pages\\\\PeriodDetailPage.tsx\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(Select-Object -ExpandProperty Lines)",
+      "Bash(powershell *)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\\\\infrastructure\\\\speedsms\\\\SpeedSmsClient.java\" -Force)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\\\\infrastructure\\\\speedsms\\\\SpeedSmsResponse.java\" -Force)",
+      "Bash(Remove-Item 'C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\\\\infrastructure\\\\speedsms\" -Force -Recurse *)",
+      "Bash(gh pr create --title 'Features: AWS SNS SMS, bulk SMS UI, SePay docs, UI enhancements' --body ' *)"
     ]
   }
 }
