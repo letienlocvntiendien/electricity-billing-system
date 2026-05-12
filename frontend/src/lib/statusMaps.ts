@@ -24,10 +24,10 @@ export const billStatusLabel: Record<BillStatus, string> = {
   OVERDUE: 'Quá hạn',
 }
 
-export const billStatusVariant: Record<BillStatus, 'default' | 'secondary' | 'success' | 'warning' | 'outline' | 'destructive'> = {
+export const billStatusVariant: Record<BillStatus, 'default' | 'secondary' | 'success' | 'warning' | 'outline' | 'destructive' | 'partial'> = {
   PENDING: 'secondary',
   SENT: 'default',
-  PARTIAL: 'warning',
+  PARTIAL: 'partial',
   PAID: 'success',
   OVERDUE: 'destructive',
 }

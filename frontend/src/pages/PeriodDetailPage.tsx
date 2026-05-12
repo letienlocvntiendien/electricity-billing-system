@@ -1458,7 +1458,7 @@ export default function PeriodDetailPage() {
                           Tổng tiền <SortIcon active={billSort.col === 'totalAmount'} dir={billSort.dir} />
                         </button>
                       </th>
-                      {/* Đã trả */}
+                      {/* Đã trả / Còn lại */}
                       <th className="px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground text-right">
                         <button className="flex items-center ml-auto hover:text-foreground transition-colors" onClick={() => toggleSort('paidAmount')}>
                           Đã trả <SortIcon active={billSort.col === 'paidAmount'} dir={billSort.dir} />
@@ -1513,7 +1513,14 @@ export default function PeriodDetailPage() {
                         </td>
                         <td className="px-4 py-3 text-right font-mono">{formatCurrency(b.serviceFee)}</td>
                         <td className="px-4 py-3 text-right font-mono">{formatCurrency(b.totalAmount)}</td>
-                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(b.paidAmount)}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="font-mono">{formatCurrency(b.paidAmount)}</span>
+                          {b.status === 'PARTIAL' && (
+                            <span className="font-mono text-[11px] text-orange-400 block leading-tight mt-0.5">
+                              còn {formatCurrency(b.totalAmount - b.paidAmount)}
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <Badge variant={billStatusVariant[b.status]}>
                             {billStatusLabel[b.status]}
@@ -1527,9 +1534,6 @@ export default function PeriodDetailPage() {
                                   Ghi thu
                                 </Button>
                               )}
-                              <Button size="sm" variant="ghost" title="Lịch sử thanh toán" onClick={() => openPaymentHistory(b)}>
-                                <Clock className="h-3.5 w-3.5" />
-                              </Button>
                               {b.status === 'PENDING' && (
                                 <Button size="sm" variant="ghost" onClick={() => handleMarkSent(b)}>
                                   Gửi
@@ -1590,6 +1594,11 @@ export default function PeriodDetailPage() {
                       <div className="rounded-md py-2" style={{ background: 'hsl(var(--muted) / 0.5)' }}>
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Đã trả</p>
                         <p className="font-mono text-xs font-semibold">{formatCurrency(b.paidAmount)}</p>
+                        {b.status === 'PARTIAL' && (
+                          <p className="font-mono text-[10px] text-orange-400 mt-0.5">
+                            Còn: {formatCurrency(b.totalAmount - b.paidAmount)}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -1603,11 +1612,6 @@ export default function PeriodDetailPage() {
                         Phí DV: <span className="font-mono text-foreground">{formatCurrency(b.serviceFee)}</span>
                       </span>
                     </div>
-                    {showBillActions && isAccountant && (
-                      <Button size="sm" variant="ghost" className="w-full" onClick={() => openPaymentHistory(b)}>
-                        <Clock className="h-3.5 w-3.5 mr-1" /> Lịch sử thanh toán
-                      </Button>
-                    )}
                     {showBillActions && isAccountant && ['PENDING', 'SENT', 'PARTIAL'].includes(b.status) && (
                       <div className="flex gap-2">
                         <Button
