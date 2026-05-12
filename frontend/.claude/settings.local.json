@@ -19,7 +19,9 @@
       "Bash(head /n 20)",
       "Bash(./mvnw dependency:unpack -Dartifact=org.springframework.boot:spring-boot-servlet:4.0.0:jar -DoutputDirectory=target/tmp-inspect)",
       "Bash(jar tf *)",
-      "Bash(./mvnw test *)"
+      "Bash(./mvnw test *)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }
