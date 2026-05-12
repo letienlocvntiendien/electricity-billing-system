@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle, Pencil, Info, AlertCircle, Search, X, ArrowUpDown, ArrowUp, ArrowDown, Clock, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle, Pencil, Info, AlertCircle, Search, X, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare } from 'lucide-react'
 import { periodsApi } from '@/api/periods'
 import { readingsApi } from '@/api/readings'
 import { billsApi } from '@/api/bills'
@@ -16,7 +16,7 @@ import { periodStatusLabel, periodStatusVariant, billStatusLabel, billStatusVari
 import type {
   PeriodResponse, BillResponse, MeterReadingResponse,
   EvnInvoiceResponse, PaymentMethod, PeriodReviewResponse, UpdatePeriodRequest, BillStatus,
-  PaymentResponse, SmsResultResponse,
+  SmsResultResponse,
 } from '@/types/api'
 
 type Tab = 'invoices' | 'readings' | 'bills'
@@ -82,9 +82,6 @@ export default function PeriodDetailPage() {
   const [addInvoiceOpen, setAddInvoiceOpen] = useState(false)
   const [paymentBill, setPaymentBill] = useState<BillResponse | null>(null)
 
-  const [historyBill, setHistoryBill] = useState<BillResponse | null>(null)
-  const [historyPayments, setHistoryPayments] = useState<PaymentResponse[]>([])
-  const [historyLoading, setHistoryLoading] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewData, setReviewData] = useState<PeriodReviewResponse | null>(null)
   const [reviewLoading, setReviewLoading] = useState(false)
@@ -386,20 +383,6 @@ export default function PeriodDetailPage() {
       window.open(objectUrl, '_blank')
     } catch (e: unknown) {
       toast.error(apiError(e, 'Lỗi tải PDF.'))
-    }
-  }
-
-  async function openPaymentHistory(bill: BillResponse) {
-    setHistoryBill(bill)
-    setHistoryPayments([])
-    setHistoryLoading(true)
-    try {
-      const payments = await billsApi.listPayments(bill.id)
-      setHistoryPayments(payments)
-    } catch {
-      toast.error('Không thể tải lịch sử thanh toán.')
-    } finally {
-      setHistoryLoading(false)
     }
   }
 
@@ -2012,72 +1995,6 @@ export default function PeriodDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Payment History Dialog ────────────────────────────────────── */}
-      <Dialog open={historyBill !== null} onOpenChange={(open) => { if (!open) setHistoryBill(null) }}>
-        <DialogContent title={`Lịch sử thanh toán — ${historyBill?.customerCode ?? ''}`}>
-          {historyLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : historyPayments.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 gap-2">
-              <Clock className="h-8 w-8 text-muted-foreground/40" />
-              <p className="text-sm text-muted-foreground">Chưa có thanh toán nào</p>
-            </div>
-          ) : (
-            <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
-              {historyPayments.map((p) => (
-                <div
-                  key={p.id}
-                  className="rounded-lg px-3 py-2.5 space-y-1.5"
-                  style={{ border: '1px solid hsl(var(--border))', background: 'hsl(var(--accent) / 0.3)' }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-emerald-400 font-mono">
-                      {formatCurrency(p.amount)}
-                    </span>
-                    <span className={cn(
-                      'text-[10px] font-mono px-1.5 py-0.5 rounded font-semibold uppercase tracking-wide',
-                      p.method === 'BANK_TRANSFER'
-                        ? 'bg-sky-500/15 text-sky-400'
-                        : p.method === 'CASH'
-                        ? 'bg-emerald-500/15 text-emerald-400'
-                        : 'bg-muted/50 text-muted-foreground',
-                    )}>
-                      {methodLabel[p.method]}
-                      {p.bankTransactionId ? ' · SePay' : ''}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(p.paidAt).toLocaleString('vi-VN', {
-                      day: '2-digit', month: '2-digit', year: 'numeric',
-                      hour: '2-digit', minute: '2-digit',
-                    })}
-                  </div>
-                  {p.bankTransactionId && (
-                    <div className="text-xs font-mono text-muted-foreground/70">
-                      Mã GD: {p.bankTransactionId}
-                      {p.bankReferenceCode && ` · Ref: ${p.bankReferenceCode}`}
-                    </div>
-                  )}
-                  {p.notes && (
-                    <div className="text-xs text-foreground/70 italic">"{p.notes}"</div>
-                  )}
-                </div>
-              ))}
-              <div
-                className="sticky bottom-0 pt-1 flex justify-between text-xs text-muted-foreground px-1"
-                style={{ background: 'hsl(var(--background))' }}
-              >
-                <span>{historyPayments.length} giao dịch</span>
-                <span className="font-mono font-semibold text-foreground">
-                  Tổng: {formatCurrency(historyPayments.reduce((s, p) => s + p.amount, 0))}
-                </span>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
