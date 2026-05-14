@@ -7,7 +7,7 @@ public class SepayWebhookPayload {
 
     private Long id;
     private String gateway;
-    private String transactionDate;   // "yyyy-MM-dd HH:mm:ss" — parsed manually
+    private String transactionDate;   // "yyyy-MM-dd HH:mm:ss" — parsed manuall         y
     private String accountNumber;
     private String subAccount;
     private String code;

@@ -59,12 +59,6 @@ public class SmsNotificationService {
                     null, false, "Khách hàng chưa có số điện thoại");
         }
 
-        if (bill.getQrCodeUrl() == null || bill.getQrCodeUrl().isBlank()) {
-            log.warn("Bill {} ({}): no QR code yet — skipping", bill.getId(), customerCode);
-            return new SmsResultResponse(bill.getId(), customerCode, customerName,
-                    phone, false, "Hóa đơn chưa có mã QR (kỳ chưa được duyệt hoặc chưa tạo PDF)");
-        }
-
         String content = buildContent(bill);
 
         log.info("SMS content for bill={} customer={} phone={}:\n{}",
@@ -103,13 +97,12 @@ public class SmsNotificationService {
         LocalDate dueDate = bill.getPeriod().getApprovedAt().toLocalDate().plusDays(overdueDays);
 
         String raw = String.format(
-                "HD dien [%s]\nKH: %s\n%d kWh | %s d\nCK: %s\nQR: %s\nHan: %s",
+                "HD dien [%s] - %s\n%d kWh - %sd\nCK: %s\nHan: %s",
                 bill.getPeriod().getName(),
                 bill.getCustomer().getFullName(),
                 bill.getConsumption(),
                 formatVnd(bill.getTotalAmount()),
                 bill.getPaymentCode(),
-                bill.getQrCodeUrl(),
                 dueDate.format(DATE_FMT));
 
         return stripDiacritics(raw);
