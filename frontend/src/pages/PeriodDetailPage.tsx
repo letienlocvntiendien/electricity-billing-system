@@ -74,6 +74,7 @@ export default function PeriodDetailPage() {
   const [generating, setGenerating] = useState(false)
   const [genProgress, setGenProgress] = useState({ done: 0, total: 0 })
   const genPollerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const paymentPollerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [readingInputs, setReadingInputs] = useState<Record<number, string>>({})
   const [submittingId, setSubmittingId] = useState<number | null>(null)
@@ -135,6 +136,29 @@ export default function PeriodDetailPage() {
   useEffect(() => {
     return () => { if (genPollerRef.current) clearInterval(genPollerRef.current) }
   }, [])
+
+  useEffect(() => {
+    const isPollingPeriod = period?.status === 'APPROVED' || period?.status === 'CLOSED'
+    if (!isAccountant || !isPollingPeriod || tab !== 'bills') {
+      if (paymentPollerRef.current) { clearInterval(paymentPollerRef.current); paymentPollerRef.current = null }
+      return
+    }
+    paymentPollerRef.current = setInterval(async () => {
+      try {
+        const updated = await periodsApi.listBills(periodId)
+        setBills((prev) => {
+          updated.forEach((newBill) => {
+            const old = prev.find((b) => b.id === newBill.id)
+            if (old && old.status !== 'PAID' && newBill.status === 'PAID') {
+              toast.success(`Hóa đơn ${newBill.customerCode} (${newBill.customerName}) đã được thanh toán tự động.`)
+            }
+          })
+          return updated
+        })
+      } catch { /* ignore poll errors */ }
+    }, 30_000)
+    return () => { if (paymentPollerRef.current) { clearInterval(paymentPollerRef.current); paymentPollerRef.current = null } }
+  }, [period?.status, tab, isAccountant, periodId, toast])
 
   useEffect(() => {
     if (recentlyDoneId === null) return
@@ -1329,7 +1353,15 @@ export default function PeriodDetailPage() {
           {/* Header: title + search + filter */}
           <div className="px-5 pt-4 pb-3 space-y-2.5" style={{ borderBottom: '1px solid hsl(var(--border))' }}>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-semibold">Hóa đơn khách hàng</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Hóa đơn khách hàng</span>
+                {(period.status === 'APPROVED' || period.status === 'CLOSED') && isAccountant && (
+                  <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Tự động cập nhật
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {(billSearch || billStatusFilter !== 'ALL') && (
                   <span className="text-xs text-muted-foreground flex-shrink-0">
