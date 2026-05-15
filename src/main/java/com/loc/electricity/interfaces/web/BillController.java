@@ -27,6 +27,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * REST controller for bill operations including payment recording, PDF retrieval, and SMS sending.
+ * Roles: ADMIN, ACCOUNTANT.
+ */
 @RestController
 @RequestMapping("/api/bills")
 @RequiredArgsConstructor
@@ -38,6 +42,12 @@ public class BillController {
     private final FileStorageService fileStorageService;
     private final SmsNotificationService smsNotificationService;
 
+    /**
+     * {@code GET /api/bills?periodId={id}} — Returns all bills for a billing period.
+     *
+     * @param periodId the billing period ID
+     * @return list of bills
+     */
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<List<BillResponse>>> listByPeriod(
@@ -47,12 +57,25 @@ public class BillController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    /**
+     * {@code GET /api/bills/{id}} — Returns a single bill.
+     *
+     * @param id the bill ID
+     * @return the bill
+     */
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<BillResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(BillResponse.from(billService.findById(id))));
     }
 
+    /**
+     * {@code POST /api/bills/{id}/mark-sent} — Marks a bill as sent and advances status to SENT.
+     *
+     * @param id          the bill ID
+     * @param currentUser the authenticated user
+     * @return the updated bill
+     */
     @PostMapping("/{id}/mark-sent")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<BillResponse>> markSent(
@@ -62,6 +85,13 @@ public class BillController {
                 BillResponse.from(billService.markSent(id, currentUser))));
     }
 
+    /**
+     * {@code GET /api/bills/{id}/zalo-link} — Builds a Zalo deep-link pre-filled with bill payment details.
+     * Returns an empty URL if the customer has no phone number.
+     *
+     * @param id the bill ID
+     * @return map containing {@code url} key with the Zalo deep-link
+     */
     @GetMapping("/{id}/zalo-link")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<Map<String, String>>> zaloLink(@PathVariable Long id) {
@@ -69,6 +99,13 @@ public class BillController {
         return ResponseEntity.ok(ApiResponse.ok(Map.of("url", url != null ? url : "")));
     }
 
+    /**
+     * {@code GET /api/bills/{id}/pdf} — Streams the generated PDF for a bill as an inline attachment.
+     * Returns 404 if the PDF has not yet been generated.
+     *
+     * @param id the bill ID
+     * @return the PDF bytes with Content-Type application/pdf
+     */
     @GetMapping("/{id}/pdf")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<byte[]> getPdf(@PathVariable Long id) {
@@ -84,6 +121,14 @@ public class BillController {
         return ResponseEntity.ok().headers(headers).body(bytes);
     }
 
+    /**
+     * {@code POST /api/bills/{id}/payments} — Records a manual payment for a bill.
+     *
+     * @param id          the bill ID
+     * @param request     payment details (amount, method, paidAt)
+     * @param currentUser the authenticated user recording the payment
+     * @return the created payment with HTTP 201
+     */
     @PostMapping("/{id}/payments")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<PaymentResponse>> addPayment(
@@ -95,6 +140,12 @@ public class BillController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok(response));
     }
 
+    /**
+     * {@code GET /api/bills/{id}/payments} — Returns all payments for a bill, newest first.
+     *
+     * @param id the bill ID
+     * @return list of payments
+     */
     @GetMapping("/{id}/payments")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<List<PaymentResponse>>> listPayments(@PathVariable Long id) {
@@ -103,6 +154,13 @@ public class BillController {
         return ResponseEntity.ok(ApiResponse.ok(payments));
     }
 
+    /**
+     * {@code POST /api/bills/send-sms} — Sends SMS bill notifications for a batch of bill IDs via AWS SNS.
+     *
+     * @param request     contains the list of bill IDs to notify
+     * @param currentUser the authenticated user triggering the batch send
+     * @return per-bill send results with success/failure details
+     */
     @PostMapping("/send-sms")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<List<SmsResultResponse>>> sendSms(

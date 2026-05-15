@@ -22,6 +22,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Generates PDF bills and VietQR codes for all bills in a billing period after it is approved.
+ * Runs asynchronously on the {@code pdfTaskExecutor} thread pool to avoid blocking the approval transaction.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -35,6 +39,12 @@ public class BillGenerationService {
     private final VietQrService vietQrService;
     private final PdfGenerationService pdfGenerationService;
 
+    /**
+     * Triggered automatically after a period approval transaction commits.
+     * Starts PDF and QR generation for all bills in the approved period asynchronously.
+     *
+     * @param event the period-approved domain event carrying the period ID
+     */
     @Async("pdfTaskExecutor")
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -42,6 +52,12 @@ public class BillGenerationService {
         doGenerate(event.getPeriodId());
     }
 
+    /**
+     * Manually triggers PDF and QR regeneration for all bills in the given period.
+     * Runs asynchronously; caller receives control immediately.
+     *
+     * @param periodId the billing period ID
+     */
     @Async("pdfTaskExecutor")
     public void regenerateForPeriod(Long periodId) {
         doGenerate(periodId);

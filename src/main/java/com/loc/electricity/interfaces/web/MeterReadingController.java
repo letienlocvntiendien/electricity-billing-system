@@ -14,12 +14,22 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST controller for meter reading operations.
+ */
 @RestController
 @RequiredArgsConstructor
 public class MeterReadingController {
 
     private final MeterReadingService meterReadingService;
 
+    /**
+     * {@code GET /api/periods/{periodId}/readings} — Returns all meter readings for a billing period.
+     * All authenticated roles may access this.
+     *
+     * @param periodId the billing period ID
+     * @return list of meter readings
+     */
     @GetMapping("/api/periods/{periodId}/readings")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<MeterReadingResponse>>> listByPeriod(
@@ -29,13 +39,23 @@ public class MeterReadingController {
         return ResponseEntity.ok(ApiResponse.ok(list));
     }
 
+    /**
+     * {@code PATCH /api/readings/{id}} — Submits a meter reading index for a customer.
+     * The period must be in OPEN status. Anomaly detection runs automatically.
+     * Roles: METER_READER, ADMIN, ACCOUNTANT.
+     *
+     * @param id          the meter reading ID
+     * @param request     the new current index and optional photo URL
+     * @param currentUser the authenticated user submitting the reading
+     * @return the updated reading with any anomaly warning
+     */
     @PatchMapping("/api/readings/{id}")
     @PreAuthorize("hasAnyRole('METER_READER','ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<MeterReadingResponse>> submitReading(
             @PathVariable Long id,
             @Valid @RequestBody UpdateMeterReadingRequest request,
             @CurrentUser User currentUser) {
-        var response = meterReadingService.submitReading(id, request, currentUser);
+        MeterReadingResponse response = meterReadingService.submitReading(id, request, currentUser);
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 }

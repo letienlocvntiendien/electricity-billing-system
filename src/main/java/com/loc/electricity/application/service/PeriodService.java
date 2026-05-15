@@ -38,6 +38,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+/**
+ * Manages the billing period lifecycle, including all state machine transitions
+ * from OPEN through CLOSED, billing calculation, and review support.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -54,15 +58,34 @@ public class PeriodService {
     private final SystemSettingService systemSettingService;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Returns all billing periods, paginated and sorted as requested.
+     *
+     * @param pageable pagination and sorting parameters
+     * @return page of billing periods
+     */
     public Page<BillingPeriod> findAll(Pageable pageable) {
         return billingPeriodRepository.findAll(pageable);
     }
 
+    /**
+     * Finds a billing period by ID.
+     *
+     * @param id the period ID
+     * @return the billing period
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     public BillingPeriod findById(Long id) {
         return billingPeriodRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("BillingPeriod", id));
     }
 
+    /**
+     * Returns the current active billing period — the most recent one in OPEN or READING_DONE status.
+     *
+     * @return the active billing period
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if no active period exists
+     */
     public BillingPeriod findCurrent() {
         return billingPeriodRepository.findFirstByStatusInOrderByStartDateDesc(
                 List.of(PeriodStatus.OPEN, PeriodStatus.READING_DONE))
@@ -70,6 +93,15 @@ public class PeriodService {
                         "No active period found (OPEN or READING_DONE)"));
     }
 
+    /**
+     * Creates a new billing period in OPEN status. Validates date range, prevents overlap with existing
+     * periods, and seeds meter reading slots for all currently active customers.
+     *
+     * @param request   period details (name, startDate, endDate, serviceFee, extraFee)
+     * @param createdBy the user performing the action
+     * @return the persisted billing period
+     * @throws com.loc.electricity.application.exception.BusinessException if dates are invalid or overlap an existing period
+     */
     @Transactional
     public BillingPeriod createPeriod(CreatePeriodRequest request, User createdBy) {
         if (request.endDate().isBefore(request.startDate())) {
@@ -110,8 +142,6 @@ public class PeriodService {
         return period;
     }
 
-    // Todo: Still need to check here and validate the value
-    // Define process 
     private void initMeterReadings(BillingPeriod period) {
         List<Customer> activeCustomers = customerRepository.findAllByActiveTrue();
 
@@ -133,6 +163,15 @@ public class PeriodService {
         log.info("Initialized {} meter readings for period {}", readings.size(), period.getId());
     }
 
+    /**
+     * Updates the period's name, extraFee, or serviceFee. Blocked when APPROVED or CLOSED.
+     *
+     * @param id        the period ID
+     * @param request   fields to update (null fields are ignored)
+     * @param updatedBy the user performing the action
+     * @return the updated period
+     * @throws com.loc.electricity.application.exception.PeriodLockedException if the period is APPROVED or CLOSED
+     */
     @Transactional
     public BillingPeriod update(Long id, UpdatePeriodRequest request, User updatedBy) {
         BillingPeriod period = findById(id);
@@ -152,6 +191,15 @@ public class PeriodService {
         return period;
     }
 
+    /**
+     * Transitions the period from OPEN to READING_DONE, signalling that all meter readings
+     * have been collected. Only METER_READER role may trigger this transition.
+     *
+     * @param id          the period ID
+     * @param submittedBy the METER_READER performing the submission
+     * @return the updated period
+     * @throws com.loc.electricity.application.exception.InvalidStateTransitionException if not in OPEN status
+     */
     @Transactional
     public BillingPeriod submitReadings(Long id, User submittedBy) {
         BillingPeriod period = findById(id);
@@ -167,6 +215,15 @@ public class PeriodService {
         return period;
     }
 
+    /**
+     * Returns a pre-calculation review for the period, including EVN totals, actual customer consumption,
+     * line-loss analysis, a preview unit price, and accountant verification status.
+     * Does not mutate any state.
+     *
+     * @param id the period ID
+     * @return the review summary
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     public PeriodReviewResponse review(Long id) {
         BillingPeriod period = findById(id);
 
@@ -236,6 +293,16 @@ public class PeriodService {
                 period.getAccountantVerifiedAt());
     }
 
+    /**
+     * Runs the Spec V2 billing formula against all submitted readings and the EVN invoice totals,
+     * persists the resulting bills, and transitions the period to CALCULATED.
+     *
+     * @param id           the period ID
+     * @param calculatedBy the ACCOUNTANT or ADMIN performing the calculation
+     * @return the updated period
+     * @throws com.loc.electricity.application.exception.InvalidStateTransitionException if not in READING_DONE
+     * @throws com.loc.electricity.application.exception.BusinessException               if no EVN invoice exists
+     */
     @Transactional
     public BillingPeriod calculate(Long id, User calculatedBy) {
         BillingPeriod period = findById(id);
@@ -292,6 +359,15 @@ public class PeriodService {
         return period;
     }
 
+    /**
+     * Records accountant verification of the period's EVN invoice reconciliation.
+     * Sets {@code accountantVerifiedBy} and {@code accountantVerifiedAt}. Period remains CALCULATED.
+     *
+     * @param id         the period ID
+     * @param verifiedBy the ACCOUNTANT or ADMIN performing the verification
+     * @return the updated period
+     * @throws com.loc.electricity.application.exception.InvalidStateTransitionException if not in CALCULATED
+     */
     @Transactional
     public BillingPeriod verify(Long id, User verifiedBy) {
         BillingPeriod period = findById(id);
@@ -308,6 +384,16 @@ public class PeriodService {
         return period;
     }
 
+    /**
+     * Transitions the period to APPROVED and triggers asynchronous PDF/QR generation for all bills.
+     * Requires prior accountant verification ({@code accountantVerifiedAt} must be set).
+     *
+     * @param id         the period ID
+     * @param approvedBy the ADMIN performing the approval
+     * @return the updated period
+     * @throws com.loc.electricity.application.exception.InvalidStateTransitionException if not in CALCULATED
+     * @throws com.loc.electricity.application.exception.BusinessException               if not yet verified by accountant
+     */
     @Transactional
     public BillingPeriod approve(Long id, User approvedBy) {
         BillingPeriod period = findById(id);
@@ -332,6 +418,15 @@ public class PeriodService {
         return period;
     }
 
+    /**
+     * Reverts the period back to OPEN from CALCULATED or APPROVED. Deletes all bills for the period,
+     * detaches their payments, and clears verified/approved metadata.
+     *
+     * @param id         the period ID
+     * @param revertedBy the ADMIN performing the revert
+     * @return the updated period
+     * @throws com.loc.electricity.application.exception.BusinessException if the period is not in CALCULATED or APPROVED
+     */
     @Transactional
     public BillingPeriod revert(Long id, User revertedBy) {
         BillingPeriod period = findById(id);
@@ -361,6 +456,15 @@ public class PeriodService {
         return period;
     }
 
+    /**
+     * Transitions the period to CLOSED. Blocked if any bills remain unpaid.
+     *
+     * @param id       the period ID
+     * @param closedBy the ADMIN performing the close
+     * @return the updated period
+     * @throws com.loc.electricity.application.exception.InvalidStateTransitionException if not in APPROVED
+     * @throws com.loc.electricity.application.exception.BusinessException               if there are unpaid bills
+     */
     @Transactional
     public BillingPeriod close(Long id, User closedBy) {
         BillingPeriod period = findById(id);

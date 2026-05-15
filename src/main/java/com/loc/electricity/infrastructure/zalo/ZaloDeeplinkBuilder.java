@@ -13,6 +13,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
+/**
+ * Builds Zalo deep-links pre-filled with bill payment details for sending to customers.
+ * The payment due date is derived from {@code period.approvedAt + overdue_days} system setting.
+ */
 @Component
 @RequiredArgsConstructor
 public class ZaloDeeplinkBuilder {
@@ -22,6 +26,13 @@ public class ZaloDeeplinkBuilder {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final NumberFormat VND_FMT = NumberFormat.getIntegerInstance(new Locale("vi", "VN"));
 
+    /**
+     * Builds a Zalo deep-link pre-filled with bill payment details.
+     *
+     * @param bill the bill to notify about
+     * @return the Zalo deep-link URL with a pre-filled message,
+     *         or {@code null} if the customer has no phone number
+     */
     public String build(Bill bill) {
         String phone = bill.getCustomer().getPhone();
         if (phone == null || phone.isBlank()) return null;

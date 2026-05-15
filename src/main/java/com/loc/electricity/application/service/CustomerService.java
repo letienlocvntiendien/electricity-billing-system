@@ -22,6 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+/**
+ * Manages customer CRUD operations, including soft-delete and automatic meter reading slot
+ * synchronization with the currently active billing period.
+ */
 @Service
 @RequiredArgsConstructor
 public class CustomerService {
@@ -31,6 +35,13 @@ public class CustomerService {
     private final BillingPeriodRepository billingPeriodRepository;
     private final MeterReadingRepository meterReadingRepository;
 
+    /**
+     * Returns a paginated list of customers, optionally filtered by active status.
+     *
+     * @param active   {@code true} for active only, {@code false} for inactive only, {@code null} for all
+     * @param pageable pagination and sorting parameters
+     * @return page of matching customers
+     */
     public Page<Customer> findAll(Boolean active, Pageable pageable) {
         if (active != null) {
             return customerRepository.findAllByActive(active, pageable);
@@ -38,11 +49,27 @@ public class CustomerService {
         return customerRepository.findAll(pageable);
     }
 
+    /**
+     * Finds a customer by ID.
+     *
+     * @param id the customer ID
+     * @return the customer
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     public Customer findById(Long id) {
         return customerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Customer", id));
     }
 
+    /**
+     * Creates a new customer. If a billing period is currently OPEN, a meter reading slot
+     * is automatically seeded for this customer using their latest submitted reading as the starting index.
+     *
+     * @param request   customer details
+     * @param createdBy the user performing the action
+     * @return the persisted customer
+     * @throws com.loc.electricity.application.exception.BusinessException if the customer code already exists
+     */
     @Transactional
     public Customer create(CreateCustomerRequest request, User createdBy) {
         if (customerRepository.existsByCode(request.code())) {
@@ -68,13 +95,23 @@ public class CustomerService {
         return customer;
     }
 
+    /**
+     * Updates customer fields. Partial update — only non-null fields in the request are applied.
+     * Re-activating a customer seeds a meter reading slot in the current OPEN period;
+     * deactivating removes any unsubmitted reading slot.
+     *
+     * @param id        the customer ID
+     * @param request   fields to update (null fields are ignored)
+     * @param updatedBy the user performing the action
+     * @return the updated customer
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     @Transactional
     public Customer update(Long id, UpdateCustomerRequest request, User updatedBy) {
         Customer customer = findById(id);
         Customer before = copyOf(customer);
 
-        boolean wasActive   = customer.isActive();
-        boolean wasInactive = !customer.isActive();
+        boolean wasActive = customer.isActive();
 
         if (request.fullName() != null) customer.setFullName(request.fullName());
         if (request.phone() != null) customer.setPhone(request.phone());
@@ -87,7 +124,7 @@ public class CustomerService {
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.UPDATE_CUSTOMER,
                 "Customer", customer.getId(), before, customer, updatedBy));
 
-        if (wasInactive && Boolean.TRUE.equals(request.active())) {
+        if (!wasActive && Boolean.TRUE.equals(request.active())) {
             addReadingToOpenPeriod(customer);
         } else if (wasActive && Boolean.FALSE.equals(request.active())) {
             removeUnsubmittedReadingFromOpenPeriod(customer);
@@ -96,6 +133,14 @@ public class CustomerService {
         return customer;
     }
 
+    /**
+     * Soft-deletes a customer by setting {@code active = false}. Any unsubmitted meter reading
+     * slot in the current OPEN period is removed; submitted readings are preserved.
+     *
+     * @param id        the customer ID
+     * @param deletedBy the user performing the action
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     @Transactional
     public void softDelete(Long id, User deletedBy) {
         Customer customer = findById(id);
@@ -108,6 +153,11 @@ public class CustomerService {
         removeUnsubmittedReadingFromOpenPeriod(customer);
     }
 
+    /**
+     * Returns all active customers, ordered by the repository default (code ascending).
+     *
+     * @return list of active customers
+     */
     public List<Customer> findAllActive() {
         return customerRepository.findAllByActiveTrue();
     }

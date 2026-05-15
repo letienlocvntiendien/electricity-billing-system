@@ -1,5 +1,6 @@
 package com.loc.electricity.application.dto.response;
 
+import com.loc.electricity.domain.bill.Bill;
 import com.loc.electricity.domain.payment.Payment;
 import com.loc.electricity.domain.payment.PaymentMethod;
 
@@ -20,11 +21,11 @@ public record PaymentResponse(
         LocalDateTime createdAt
 ) {
     public static PaymentResponse from(Payment p) {
-        String paymentCode = p.getBill() != null ? p.getBill().getPaymentCode() : null;
+        Bill bill = p.getBill();
         return new PaymentResponse(
                 p.getId(),
-                p.getBill() != null ? p.getBill().getId() : null,
-                paymentCode,
+                bill != null ? bill.getId() : null,
+                bill != null ? bill.getPaymentCode() : null,
                 p.getAmount(), p.getMethod(), p.getPaidAt(),
                 p.getBankTransactionId(), p.getBankReferenceCode(),
                 p.getRawContent(), p.getNotes(), p.getCreatedAt());

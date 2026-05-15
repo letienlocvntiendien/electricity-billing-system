@@ -112,12 +112,32 @@ public class PdfGenerationService {
 
     // ═══════════════════════════ Entry points ════════════════════════════
 
+    /**
+     * Generates the bill PDF and persists it via {@link FileStorageService}.
+     *
+     * @param bill   the bill to render
+     * @param qrUrl  URL of the pre-generated VietQR image; may be {@code null} (a placeholder is shown)
+     * @param data   supplementary display data (meter indices, due date, bank details)
+     * @return the relative storage path of the saved PDF file
+     */
     public String generateAndStore(Bill bill, String qrUrl, PdfBillData data) {
         byte[] pdfBytes = generate(bill, qrUrl, data);
         String relativePath = "pdf/" + bill.getPeriod().getCode() + "/" + bill.getId() + ".pdf";
         return fileStorageService.store(pdfBytes, relativePath);
     }
 
+    /**
+     * Renders the bill as A4-landscape PDF bytes with two liên (copies) side by side.
+     * <p>
+     * Liên 2 (left) — kế toán giữ; includes a signature block.<br>
+     * Liên 1 (right) — giao khách hàng; includes VietQR and the payment box.
+     *
+     * @param bill   the bill to render
+     * @param qrUrl  URL of the pre-generated VietQR image; may be {@code null}
+     * @param data   supplementary display data (meter indices, due date, bank details)
+     * @return raw PDF bytes
+     * @throws RuntimeException if PDF generation fails
+     */
     public byte[] generate(Bill bill, String qrUrl, PdfBillData data) {
         Document doc = new Document(A4_LANDSCAPE, 18f, 18f, 16f, 16f);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();

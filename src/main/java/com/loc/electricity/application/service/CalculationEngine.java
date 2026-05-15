@@ -8,6 +8,17 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
+/**
+ * Stateless billing calculation engine implementing the Spec V2 formula.
+ *
+ * <p>Formula:
+ * <pre>
+ *   unit_price         = (evnTotalAmount + extraFee) / totalConsumption  [HALF_UP, 2 decimals]
+ *   electricityAmount  = unit_price × consumption                        [HALF_UP, 0 decimals]
+ *   serviceAmount      = serviceFee                                      [flat per household]
+ *   totalAmount        = electricityAmount + serviceAmount
+ * </pre>
+ */
 @Service
 public class CalculationEngine {
 
@@ -27,6 +38,17 @@ public class CalculationEngine {
 
     public record CalculationOutput(BigDecimal unitPrice, List<BillOutput> bills) {}
 
+    /**
+     * Computes unit price and individual bill amounts for a set of meter readings.
+     * Bills with a zero total amount are automatically set to PAID status.
+     *
+     * @param evnTotalAmount total amount on the EVN master invoice
+     * @param extraFee       additional overhead fee added to the EVN amount before dividing
+     * @param serviceFee     flat service fee applied per household (not per kWh)
+     * @param readings       submitted readings for each customer
+     * @return the computed unit price and per-customer bill breakdown
+     * @throws com.loc.electricity.application.exception.BusinessException if total consumption across all readings is zero
+     */
     public CalculationOutput calculate(
             BigDecimal evnTotalAmount,
             BigDecimal extraFee,

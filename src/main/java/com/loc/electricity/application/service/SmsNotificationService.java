@@ -23,6 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Sends SMS bill notifications to customers via AWS SNS.
+ * Messages are stripped of Vietnamese diacritics to comply with SMS character set limitations.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,6 +40,14 @@ public class SmsNotificationService {
     private final AwsSnsClient awsSnsClient;
     private final SystemSettingService systemSettingService;
 
+    /**
+     * Sends SMS notifications for the given list of bill IDs. Each bill is processed independently —
+     * a failure for one bill does not prevent others from being sent.
+     *
+     * @param billIds list of bill IDs to notify
+     * @param actor   the user triggering the batch send (recorded in the SMS log)
+     * @return per-bill send results indicating success or failure with error details
+     */
     @Transactional
     public List<SmsResultResponse> sendBillSmsBatch(List<Long> billIds, User actor) {
         List<Bill> bills = billRepository.findAllByIdIn(billIds);
