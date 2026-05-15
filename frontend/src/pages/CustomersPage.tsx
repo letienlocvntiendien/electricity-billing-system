@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Users, Plus, Pencil, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Users, Plus, Pencil, Trash2, Loader2, AlertCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { customersApi } from '@/api/customers'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,11 +8,15 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { useAuth } from '@/context/AuthContext'
 import { useToast } from '@/context/ToastContext'
+import { cn } from '@/lib/utils'
 import type { CustomerResponse, CreateCustomerRequest, UpdateCustomerRequest } from '@/types/api'
 
 const emptyCreate = (): CreateCustomerRequest => ({
   code: '', fullName: '', phone: '', zaloPhone: '', meterSerial: '', notes: '',
 })
+
+type SortKey = 'code' | 'fullName' | 'active'
+type StatusFilter = 'all' | 'active' | 'inactive'
 
 export default function CustomersPage() {
   const { isAdmin } = useAuth()
@@ -27,6 +31,11 @@ export default function CustomersPage() {
 
   const [createForm, setCreateForm] = useState<CreateCustomerRequest>(emptyCreate())
   const [editForm, setEditForm] = useState<UpdateCustomerRequest>({})
+
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [sortKey, setSortKey] = useState<SortKey>('code')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     customersApi.list()
@@ -51,6 +60,37 @@ export default function CustomersPage() {
     })
     setSaveError(null)
   }
+
+  function handleSort(col: SortKey) {
+    if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(col); setSortDir('asc') }
+  }
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+  }
+
+  const displayCustomers = useMemo(() => {
+    let r = customers
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      r = r.filter(c =>
+        c.code.toLowerCase().includes(q) ||
+        c.fullName.toLowerCase().includes(q) ||
+        (c.phone ?? '').toLowerCase().includes(q) ||
+        (c.meterSerial ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (statusFilter === 'active') r = r.filter(c => c.active)
+    if (statusFilter === 'inactive') r = r.filter(c => !c.active)
+    return [...r].sort((a, b) => {
+      const cmp = sortKey === 'code' ? a.code.localeCompare(b.code)
+                : sortKey === 'fullName' ? a.fullName.localeCompare(b.fullName)
+                : Number(b.active) - Number(a.active)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [customers, search, statusFilter, sortKey, sortDir])
 
   async function handleCreate(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -97,6 +137,8 @@ export default function CustomersPage() {
     }
   }
 
+  const isFiltered = search.trim() !== '' || statusFilter !== 'all'
+
   return (
     <div className="p-6 space-y-4">
       {/* Page header */}
@@ -111,7 +153,11 @@ export default function CustomersPage() {
           <div>
             <h1 className="text-xl font-semibold text-foreground">Khách hàng</h1>
             {!loading && (
-              <p className="text-xs text-muted-foreground">{customers.length} khách hàng</p>
+              <p className="text-xs text-muted-foreground">
+                {isFiltered
+                  ? `${displayCustomers.length} / ${customers.length} khách hàng`
+                  : `${customers.length} khách hàng`}
+              </p>
             )}
           </div>
         </div>
@@ -122,31 +168,87 @@ export default function CustomersPage() {
         )}
       </div>
 
+      {/* Search + filter bar */}
+      {!loading && customers.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-52">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Tìm theo mã, tên, SĐT, số đồng hồ..."
+              className="pl-8 h-8 text-sm"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center rounded-md border divide-x overflow-hidden text-xs">
+            {(['all', 'active', 'inactive'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  'px-3 h-8 transition-colors',
+                  statusFilter === s
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
+                )}
+              >
+                {s === 'all' ? 'Tất cả' : s === 'active' ? 'Hoạt động' : 'Ngừng'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-card">
         {loading ? (
           <p className="px-6 py-10 text-sm text-center text-muted-foreground">Đang tải...</p>
         ) : customers.length === 0 ? (
           <p className="px-6 py-10 text-sm text-center text-muted-foreground">Chưa có khách hàng.</p>
+        ) : displayCustomers.length === 0 ? (
+          <p className="px-6 py-10 text-sm text-center text-muted-foreground">Không tìm thấy kết quả.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Mã KH</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Họ tên</th>
+                  <th
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('code')}
+                  >
+                    <span className="inline-flex items-center gap-1">Mã KH <SortIcon col="code" /></span>
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('fullName')}
+                  >
+                    <span className="inline-flex items-center gap-1">Họ tên <SortIcon col="fullName" /></span>
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Điện thoại</th>
                   <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Số đồng hồ</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Trạng thái</th>
+                  <th
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('active')}
+                  >
+                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon col="active" /></span>
+                  </th>
                   {isAdmin && <th className="px-4 py-3" />}
                 </tr>
               </thead>
               <tbody>
-                {customers.map((c, i) => (
+                {displayCustomers.map((c, i) => (
                   <tr
                     key={c.id}
                     className="data-row hover:bg-accent/40 transition-colors"
-                    style={i < customers.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
+                    style={i < displayCustomers.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
                   >
                     <td className="px-4 py-3 font-mono text-sm font-semibold text-primary">{c.code}</td>
                     <td className="px-4 py-3 text-foreground">{c.fullName}</td>

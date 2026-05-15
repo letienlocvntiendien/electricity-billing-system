@@ -23,6 +23,7 @@ import com.loc.electricity.infrastructure.persistence.EvnInvoiceRepository;
 import com.loc.electricity.infrastructure.persistence.MeterReadingRepository;
 import com.loc.electricity.infrastructure.persistence.PaymentRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +38,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PeriodService {
@@ -98,6 +100,7 @@ public class PeriodService {
                 .serviceFee(serviceFee)
                 .build();
         period = billingPeriodRepository.save(period);
+        log.info("Period created: id={} code={} serviceFee={}", period.getId(), period.getCode(), serviceFee);
 
         initMeterReadings(period);
 
@@ -127,6 +130,7 @@ public class PeriodService {
         }).toList();
 
         meterReadingRepository.saveAll(readings);
+        log.info("Initialized {} meter readings for period {}", readings.size(), period.getId());
     }
 
     @Transactional
@@ -155,6 +159,7 @@ public class PeriodService {
 
         period.setStatus(PeriodStatus.READING_DONE);
         period = billingPeriodRepository.save(period);
+        log.info("Readings submitted for period {} by {}", id, submittedBy.getUsername());
 
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.SUBMIT_READINGS,
                 "BillingPeriod", period.getId(), null, period, submittedBy));
@@ -275,6 +280,7 @@ public class PeriodService {
         }).toList();
 
         billRepository.saveAll(bills);
+        log.info("Period {} calculated: unitPrice={} bills={}", period.getId(), result.unitPrice(), bills.size());
 
         period.setUnitPrice(result.unitPrice());
         period.setStatus(PeriodStatus.CALCULATED);
@@ -294,6 +300,7 @@ public class PeriodService {
         period.setAccountantVerifiedBy(verifiedBy);
         period.setAccountantVerifiedAt(LocalDateTime.now());
         period = billingPeriodRepository.save(period);
+        log.info("Period {} verified by {}", id, verifiedBy.getUsername());
 
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.VERIFY_PERIOD,
                 "BillingPeriod", period.getId(), null, period, verifiedBy));
@@ -316,6 +323,7 @@ public class PeriodService {
         period.setApprovedBy(approvedBy);
         period.setApprovedAt(LocalDateTime.now());
         period = billingPeriodRepository.save(period);
+        log.info("Period {} approved by {}", id, approvedBy.getUsername());
 
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.APPROVE_PERIOD,
                 "BillingPeriod", period.getId(), null, period, approvedBy));
@@ -369,6 +377,7 @@ public class PeriodService {
         period.setStatus(PeriodStatus.CLOSED);
         period.setClosedAt(LocalDateTime.now());
         period = billingPeriodRepository.save(period);
+        log.info("Period {} closed by {}", id, closedBy.getUsername());
 
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.CLOSE_PERIOD,
                 "BillingPeriod", period.getId(), null, period, closedBy));

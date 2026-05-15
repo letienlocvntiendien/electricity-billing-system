@@ -1,18 +1,28 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Plus, Pencil, Loader2, AlertCircle, AlertTriangle, ChevronRight } from 'lucide-react'
+import { CalendarDays, Plus, Pencil, Loader2, AlertCircle, AlertTriangle, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
 import { periodsApi } from '@/api/periods'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { formatCurrency } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import { periodStatusLabel, periodStatusVariant } from '@/lib/statusMaps'
 import { useAuth } from '@/context/AuthContext'
 import type { PeriodResponse, CreatePeriodRequest, UpdatePeriodRequest } from '@/types/api'
 
 const LOCKED = new Set(['APPROVED', 'CLOSED'])
+
+type SortKey = 'name' | 'startDate' | 'status' | 'evnKwh' | 'unitPrice'
+type StatusFilter = 'all' | 'active' | 'APPROVED' | 'CLOSED'
+
+const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
+  all: 'Tất cả',
+  active: 'Đang xử lý',
+  APPROVED: 'Đã duyệt',
+  CLOSED: 'Đã đóng',
+}
 
 export default function PeriodsPage() {
   const { isAdmin } = useAuth()
@@ -28,6 +38,11 @@ export default function PeriodsPage() {
     name: '', startDate: '', endDate: '', serviceFee: 10000,
   })
   const [editForm, setEditForm] = useState<UpdatePeriodRequest>({})
+
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [sortKey, setSortKey] = useState<SortKey>('startDate')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
     periodsApi.list()
@@ -47,6 +62,35 @@ export default function PeriodsPage() {
     setEditForm({ name: p.name, extraFee: p.extraFee, serviceFee: p.serviceFee })
     setSaveError(null)
   }
+
+  function handleSort(col: SortKey) {
+    if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(col); setSortDir(col === 'startDate' || col === 'evnKwh' || col === 'unitPrice' ? 'desc' : 'asc') }
+  }
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />
+    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+  }
+
+  const displayPeriods = useMemo(() => {
+    let r = periods
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      r = r.filter(p => p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q))
+    }
+    if (statusFilter === 'active') r = r.filter(p => ['OPEN', 'READING_DONE', 'CALCULATED'].includes(p.status))
+    else if (statusFilter !== 'all') r = r.filter(p => p.status === statusFilter)
+    return [...r].sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'name') cmp = a.name.localeCompare(b.name)
+      else if (sortKey === 'startDate') cmp = a.startDate.localeCompare(b.startDate)
+      else if (sortKey === 'status') cmp = a.status.localeCompare(b.status)
+      else if (sortKey === 'evnKwh') cmp = a.evnTotalKwh - b.evnTotalKwh
+      else if (sortKey === 'unitPrice') cmp = (a.unitPrice ?? 0) - (b.unitPrice ?? 0)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+  }, [periods, search, statusFilter, sortKey, sortDir])
 
   async function handleCreate(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -81,6 +125,8 @@ export default function PeriodsPage() {
     }
   }
 
+  const isFiltered = search.trim() !== '' || statusFilter !== 'all'
+
   return (
     <div className="p-6 space-y-4">
       {/* Page header */}
@@ -95,7 +141,11 @@ export default function PeriodsPage() {
           <div>
             <h1 className="text-xl font-semibold text-foreground">Kỳ thanh toán</h1>
             {!loading && (
-              <p className="text-xs text-muted-foreground">{periods.length} kỳ</p>
+              <p className="text-xs text-muted-foreground">
+                {isFiltered
+                  ? `${displayPeriods.length} / ${periods.length} kỳ`
+                  : `${periods.length} kỳ`}
+              </p>
             )}
           </div>
         </div>
@@ -110,31 +160,97 @@ export default function PeriodsPage() {
         )}
       </div>
 
+      {/* Search + filter bar */}
+      {!loading && periods.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-52">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Tìm theo tên hoặc mã kỳ..."
+              className="pl-8 h-8 text-sm"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center rounded-md border divide-x overflow-hidden text-xs">
+            {(['all', 'active', 'APPROVED', 'CLOSED'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={cn(
+                  'px-3 h-8 transition-colors',
+                  statusFilter === s
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/40'
+                )}
+              >
+                {STATUS_FILTER_LABELS[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Table */}
       <div className="rounded-lg border bg-card">
         {loading ? (
           <p className="px-6 py-10 text-sm text-center text-muted-foreground">Đang tải...</p>
         ) : periods.length === 0 ? (
           <p className="px-6 py-10 text-sm text-center text-muted-foreground">Chưa có kỳ nào.</p>
+        ) : displayPeriods.length === 0 ? (
+          <p className="px-6 py-10 text-sm text-center text-muted-foreground">Không tìm thấy kết quả.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid hsl(var(--border))' }}>
-                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Tên kỳ</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Thời gian</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">EVN (kWh)</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Đơn giá</th>
-                  <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Trạng thái</th>
+                  <th
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('name')}
+                  >
+                    <span className="inline-flex items-center gap-1">Tên kỳ <SortIcon col="name" /></span>
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('startDate')}
+                  >
+                    <span className="inline-flex items-center gap-1">Thời gian <SortIcon col="startDate" /></span>
+                  </th>
+                  <th
+                    className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('evnKwh')}
+                  >
+                    <span className="inline-flex items-center justify-end gap-1">EVN (kWh) <SortIcon col="evnKwh" /></span>
+                  </th>
+                  <th
+                    className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('unitPrice')}
+                  >
+                    <span className="inline-flex items-center justify-end gap-1">Đơn giá <SortIcon col="unitPrice" /></span>
+                  </th>
+                  <th
+                    className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                    onClick={() => handleSort('status')}
+                  >
+                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon col="status" /></span>
+                  </th>
                   {isAdmin && <th className="px-4 py-3" />}
                 </tr>
               </thead>
               <tbody>
-                {periods.map((p, i) => (
+                {displayPeriods.map((p, i) => (
                   <tr
                     key={p.id}
                     className={`data-row hover:bg-accent/40 transition-colors ${p.status === 'CLOSED' ? 'opacity-55' : ''}`}
-                    style={i < periods.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
+                    style={i < displayPeriods.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
                   >
                     <td className="px-4 py-3">
                       <Link
