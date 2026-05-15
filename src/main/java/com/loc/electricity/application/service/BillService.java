@@ -7,6 +7,7 @@ import com.loc.electricity.domain.bill.BillStatus;
 import com.loc.electricity.domain.user.User;
 import com.loc.electricity.infrastructure.persistence.BillRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class BillService {
@@ -45,6 +47,7 @@ public class BillService {
             bill.setStatus(BillStatus.SENT);
         }
 
+        log.info("Bill {} marked as sent via Zalo (status={})", id, bill.getStatus());
         return billRepository.save(bill);
     }
 }

@@ -8,6 +8,7 @@ import com.loc.electricity.domain.user.User;
 import com.loc.electricity.infrastructure.persistence.UserRepository;
 import com.loc.electricity.interfaces.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -16,6 +17,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -27,6 +29,7 @@ public class AuthService {
 
     @Transactional
     public LoginResponse login(LoginRequest request) {
+        log.info("Login attempt: username={}", request.username());
         Authentication auth = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.username(), request.password()));
 
@@ -38,6 +41,7 @@ public class AuthService {
         eventPublisher.publishEvent(new AuditEvent(this, AuditAction.LOGIN,
                 "User", user.getId(), null, null, user));
 
+        log.info("Login successful: username={} role={}", user.getUsername(), user.getRole());
         return new LoginResponse(accessToken, user.getUsername(), user.getFullName(), user.getRole().name());
     }
 }
