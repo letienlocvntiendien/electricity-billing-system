@@ -9,5 +9,6 @@ public record PdfBillData(
         int currentIndex,
         LocalDate dueDate,
         String bankAccountNumber,
-        String bankAccountHolder
+        String bankAccountHolder,
+        String contactPhone
 ) {}

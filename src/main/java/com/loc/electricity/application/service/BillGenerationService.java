@@ -54,6 +54,7 @@ public class BillGenerationService {
         String companyAddress    = settingOrDefault("company_address",     "");
         String bankAccountNumber = settingOrDefault("bank_account_number", "");
         String bankAccountHolder = settingOrDefault("bank_account_holder", "");
+        String contactPhone      = settingOrDefault("company_phone",       "");
         int overdueDays          = settingIntOrDefault("overdue_days",     DEFAULT_OVERDUE_DAYS);
 
         List<Bill> bills = billRepository.findAllByPeriodId(periodId);
@@ -79,7 +80,8 @@ public class BillGenerationService {
                         reading != null ? reading.getCurrentIndex()  : 0,
                         dueDate,
                         bankAccountNumber,
-                        bankAccountHolder
+                        bankAccountHolder,
+                        contactPhone
                 );
 
                 String pdfRelativePath = pdfGenerationService.generateAndStore(bill, qrUrl, data);
