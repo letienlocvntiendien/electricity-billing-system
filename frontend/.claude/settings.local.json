@@ -24,7 +24,8 @@
       "Bash(echo \"EXIT:$?\")",
       "Bash(dir /s /b)",
       "Bash(findstr /E \"\\\\.\\(java|html|jrxml|xml|ftl|csv\\)$\")",
-      "Bash(cmd /c \"cd /d C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system && mvnw.cmd compile -q\")"
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system && mvnw.cmd compile -q\")",
+      "Skill(electricity-bill-pdf)"
     ]
   }
 }

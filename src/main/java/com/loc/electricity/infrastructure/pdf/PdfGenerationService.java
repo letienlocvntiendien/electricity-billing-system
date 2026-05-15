@@ -4,9 +4,6 @@ import com.loc.electricity.domain.bill.Bill;
 import com.loc.electricity.domain.bill.BillStatus;
 import com.loc.electricity.infrastructure.storage.FileStorageService;
 import com.lowagie.text.*;
-import com.lowagie.text.Font;
-import com.lowagie.text.Image;
-import com.lowagie.text.Rectangle;
 import com.lowagie.text.pdf.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -172,7 +169,7 @@ public class PdfGenerationService {
         cell.addElement(brandBar());
         cell.addElement(buildHeader(bill, f, isCustomerCopy));
 
-        cell.addElement(buildSection("KHÁCH HÀNG", f, buildCustomerTable(bill, f)));
+        cell.addElement(buildSection("KHÁCH HÀNG", f, buildCustomerTable(bill, data, f, isCustomerCopy)));
         cell.addElement(buildSection("CHỈ SỐ TIÊU THỤ", f, buildConsumptionHero(bill, data, f)));
         cell.addElement(buildSection("CHI TIẾT TÍNH TIỀN", f, buildCalculationBlock(bill, f)));
 
@@ -276,14 +273,17 @@ public class PdfGenerationService {
 
     // ═══════════════════════════ Customer block ══════════════════════════
 
-    private PdfPTable buildCustomerTable(Bill bill, Fonts f) {
+    private PdfPTable buildCustomerTable(Bill bill, PdfBillData data, Fonts f, boolean isCustomerCopy) {
         PdfPTable t = twoCol(2f, 5f);
         addLabelValueRow(t, "Mã KH:", bill.getCustomer().getCode(), f);
         addLabelValueRow(t, "Họ tên:", bill.getCustomer().getFullName(), f);
-
-        String serial = bill.getCustomer().getMeterSerial();
-        if (serial != null && !serial.isBlank()) {
-            addLabelValueRow(t, "Số đồng hồ:", serial, f);
+        if (isCustomerCopy) {
+            String phone = (data.contactPhone() != null && !data.contactPhone().isBlank())
+                    ? data.contactPhone() : "—";
+            addLabelValueRow(t, "SĐT liên hệ:", phone, f);
+        } else {
+            String phone = bill.getCustomer().getPhone();
+            addLabelValueRow(t, "SĐT:", phone != null ? phone : "—", f);
         }
         return t;
     }
