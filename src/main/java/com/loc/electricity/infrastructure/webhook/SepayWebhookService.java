@@ -14,11 +14,21 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * Processes incoming SePay bank transfer notifications.
+ * <p>
+ * Matches transfers to bills via the payment code embedded in the transfer description
+ * (pattern: {@code TIENDIEN <code> <suffix>}), records a {@link com.loc.electricity.domain.payment.Payment},
+ * and advances the matched bill to {@code PAID} or {@code PARTIAL} status.
+ * Unmatched transfers are saved with {@code bill = null} for manual reconciliation.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -33,6 +43,15 @@ public class SepayWebhookService {
     private final BillRepository billRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Processes a single SePay bank transfer notification.
+     * <p>
+     * Skips non-inbound transfers and duplicate transaction IDs.
+     * Always saves a {@link com.loc.electricity.domain.payment.Payment} record regardless of match result;
+     * if a bill is matched, updates its {@code paidAmount} and advances the bill status.
+     *
+     * @param payload the SePay notification payload
+     */
     @Transactional
     public void handleWebhook(SepayWebhookPayload payload) {
         if (!"in".equalsIgnoreCase(payload.getTransferType())) {
@@ -74,17 +93,17 @@ public class SepayWebhookService {
         }
     }
 
-    private java.util.Optional<String> parsePaymentCode(String content) {
-        if (content == null) return java.util.Optional.empty();
+    private Optional<String> parsePaymentCode(String content) {
+        if (content == null) return Optional.empty();
         Matcher m = PAYMENT_CODE_PATTERN.matcher(content);
         if (m.find()) {
-            return java.util.Optional.of("TIENDIEN " + m.group(1).toUpperCase() + " " + m.group(2).toUpperCase());
+            return Optional.of("TIENDIEN " + m.group(1).toUpperCase() + " " + m.group(2).toUpperCase());
         }
-        return java.util.Optional.empty();
+        return Optional.empty();
     }
 
-    void updateBillStatus(Bill bill, java.math.BigDecimal incoming) {
-        java.math.BigDecimal newPaid = bill.getPaidAmount().add(incoming);
+    private void updateBillStatus(Bill bill, BigDecimal incoming) {
+        BigDecimal newPaid = bill.getPaidAmount().add(incoming);
         bill.setPaidAmount(newPaid);
         bill.setStatus(newPaid.compareTo(bill.getTotalAmount()) >= 0 ? BillStatus.PAID : BillStatus.PARTIAL);
         billRepository.save(bill);

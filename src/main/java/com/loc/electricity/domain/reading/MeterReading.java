@@ -65,6 +65,16 @@ public class MeterReading {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /**
+     * Computes consumption from the submitted meter indices.
+     * <p>
+     * Note: the {@code consumption} column is a STORED GENERATED column in MySQL
+     * (computed by the DB as {@code current_index - previous_index}).
+     * This method provides the same calculation in-memory for use before the entity
+     * is persisted or when running against H2 in tests.
+     *
+     * @return {@code currentIndex - previousIndex}
+     */
     public int computedConsumption() {
         return currentIndex - previousIndex;
     }

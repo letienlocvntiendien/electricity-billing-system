@@ -11,6 +11,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * REST controller for financial reporting. Roles: ADMIN, ACCOUNTANT.
+ */
 @RestController
 @RequestMapping("/api/reports")
 @RequiredArgsConstructor
@@ -18,6 +21,12 @@ public class ReportController {
 
     private final ReportService reportService;
 
+    /**
+     * {@code GET /api/reports/debt} — Returns all unpaid bills across all periods
+     * (status: PENDING, SENT, PARTIAL, OVERDUE).
+     *
+     * @return list of unpaid bills
+     */
     @GetMapping("/debt")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<List<BillResponse>>> debtReport() {
@@ -26,6 +35,13 @@ public class ReportController {
         return ResponseEntity.ok(ApiResponse.ok(response));
     }
 
+    /**
+     * {@code GET /api/reports/period/{id}} — Returns a financial summary for the given billing period,
+     * including total billed, collected, outstanding balance, bill counts by status, and rounding diff.
+     *
+     * @param id the billing period ID
+     * @return the period financial summary
+     */
     @GetMapping("/period/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<PeriodSummaryResponse>> periodSummary(@PathVariable Long id) {

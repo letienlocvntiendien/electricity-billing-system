@@ -22,12 +22,27 @@ public class SepayWebhookController {
 
     private final SepayWebhookService sepayWebhookService;
 
+    /**
+     * {@code POST /api/webhooks/sepay} — Receives a bank transfer notification from SePay.
+     * Always returns HTTP 200 to prevent SePay from retrying; auth is enforced by
+     * {@link SepayWebhookAuthFilter} via the {@code Apikey} header.
+     *
+     * @param payload the SePay notification payload
+     * @return {@code {"success": true}}
+     */
     @PostMapping("/sepay")
     public ResponseEntity<Map<String, Boolean>> handleSepay(@RequestBody SepayWebhookPayload payload) {
         sepayWebhookService.handleWebhook(payload);
         return ResponseEntity.ok(Map.of("success", true));
     }
 
+    /**
+     * Catches any unhandled exception during webhook processing and returns HTTP 200.
+     * This prevents SePay from retrying on processing errors; the error is logged for investigation.
+     *
+     * @param e the exception that occurred
+     * @return {@code {"success": true}}
+     */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Boolean>> handleError(Exception e) {
         log.error("SePay webhook processing error", e);

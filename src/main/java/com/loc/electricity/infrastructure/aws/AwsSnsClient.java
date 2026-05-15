@@ -16,6 +16,10 @@ import software.amazon.awssdk.services.sns.model.SnsException;
 
 import java.util.Map;
 
+/**
+ * AWS SNS client wrapper for sending transactional SMS messages.
+ * Handles Vietnamese phone number normalization to E.164 format (+84 prefix).
+ */
 @Component
 @Slf4j
 public class AwsSnsClient {
@@ -23,6 +27,16 @@ public class AwsSnsClient {
     private final SnsClient snsClient;
     private final String smsType;
 
+    /**
+     * Initializes the SNS client.
+     * Uses static credentials when both {@code accessKeyId} and {@code secretAccessKey} are provided;
+     * falls back to the AWS default credentials chain (instance profile, env vars, etc.) otherwise.
+     *
+     * @param region          AWS region (e.g. {@code ap-southeast-1})
+     * @param accessKeyId     IAM access key ID; leave blank to use the default provider chain
+     * @param secretAccessKey IAM secret access key; leave blank to use the default provider chain
+     * @param smsType         SNS SMS type — {@code Transactional} or {@code Promotional}
+     */
     public AwsSnsClient(
             @Value("${aws.region}") String region,
             @Value("${aws.access-key-id:}") String accessKeyId,
@@ -45,6 +59,14 @@ public class AwsSnsClient {
         log.info("AwsSnsClient initialized: region={} smsType={}", region, smsType);
     }
 
+    /**
+     * Sends an SMS via AWS SNS.
+     *
+     * @param phone   the recipient phone number (Vietnamese format: {@code 0xxx}, {@code +84xxx}, or {@code 84xxx})
+     * @param content the SMS body text
+     * @return the SNS message ID on success
+     * @throws RuntimeException if the SNS publish call fails
+     */
     public String send(String phone, String content) {
         String e164Phone = toE164Vietnam(phone);
         log.info("AWS SNS → Sending: phone={} e164={} contentLength={}", phone, e164Phone, content.length());

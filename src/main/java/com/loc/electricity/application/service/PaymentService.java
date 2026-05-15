@@ -23,6 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Manages payment creation, assignment to bills, and queries.
+ * Supports both manual (staff-recorded) payments and assignment of unmatched bank transfers.
+ */
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
@@ -31,19 +35,48 @@ public class PaymentService {
     private final BillRepository billRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Returns a paginated list of bank transfer payments that have not yet been matched to a bill.
+     *
+     * @param pageable pagination and sorting parameters
+     * @return page of unmatched payments
+     */
     public Page<Payment> findUnmatched(Pageable pageable) {
         return paymentRepository.findByBillIdIsNull(pageable);
     }
 
+    /**
+     * Returns all payments for the given bill, ordered by payment date descending.
+     *
+     * @param billId the bill ID
+     * @return list of payments
+     */
     public List<Payment> findByBillId(Long billId) {
         return paymentRepository.findByBillIdOrderByPaidAtDesc(billId);
     }
 
+    /**
+     * Finds a payment by ID.
+     *
+     * @param id the payment ID
+     * @return the payment
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     public Payment findById(Long id) {
         return paymentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Payment", id));
     }
 
+    /**
+     * Records a manual payment against a bill and recalculates the bill's paid amount and status.
+     *
+     * @param billId     the target bill ID
+     * @param request    payment details (amount, method, paidAt, notes)
+     * @param recordedBy the user recording the payment
+     * @return the persisted payment
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if the bill is not found
+     * @throws com.loc.electricity.application.exception.BusinessException         if the bill is already fully paid
+     */
     @Transactional
     public Payment createManualPayment(Long billId, CreatePaymentRequest request, User recordedBy) {
         Bill bill = billRepository.findById(billId)
@@ -72,6 +105,16 @@ public class PaymentService {
         return payment;
     }
 
+    /**
+     * Links an unmatched payment to the specified bill, then recalculates the bill's paid amount and status.
+     *
+     * @param paymentId  the unmatched payment ID
+     * @param request    contains the target bill ID
+     * @param assignedBy the user performing the assignment
+     * @return the updated payment
+     * @throws com.loc.electricity.application.exception.BusinessException if the payment is already assigned
+     *                                                                     or the target bill is already fully paid
+     */
     @Transactional
     public Payment assignPayment(Long paymentId, AssignPaymentRequest request, User assignedBy) {
         Payment payment = findById(paymentId);

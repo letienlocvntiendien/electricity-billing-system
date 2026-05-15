@@ -15,6 +15,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * REST controller for managing unmatched bank transfer payments. Roles: ADMIN, ACCOUNTANT.
+ */
 @RestController
 @RequestMapping("/api/payments")
 @RequiredArgsConstructor
@@ -22,6 +25,13 @@ public class PaymentController {
 
     private final PaymentService paymentService;
 
+    /**
+     * {@code GET /api/payments/unmatched} — Returns paginated bank transfer payments
+     * that have not yet been matched to a bill. Roles: ADMIN, ACCOUNTANT.
+     *
+     * @param pageable pagination and sorting (default: size=20, sort=createdAt)
+     * @return page of unmatched payments
+     */
     @GetMapping("/unmatched")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<Page<PaymentResponse>>> listUnmatched(
@@ -31,6 +41,15 @@ public class PaymentController {
         return ResponseEntity.ok(ApiResponse.ok(page));
     }
 
+    /**
+     * {@code POST /api/payments/{id}/assign} — Links an unmatched payment to a bill.
+     * Recalculates the bill's paid amount and status. Roles: ADMIN, ACCOUNTANT.
+     *
+     * @param id          the unmatched payment ID
+     * @param request     contains the target bill ID
+     * @param currentUser the authenticated user
+     * @return the updated payment
+     */
     @PostMapping("/{id}/assign")
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<PaymentResponse>> assign(

@@ -18,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+/**
+ * Manages EVN master invoice records for billing periods.
+ * All mutations are blocked when the period is in APPROVED or CLOSED status.
+ */
 @Service
 @RequiredArgsConstructor
 public class EvnInvoiceService {
@@ -27,15 +31,38 @@ public class EvnInvoiceService {
     private final PeriodWriteGuard periodWriteGuard;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Returns all EVN invoices for the given billing period.
+     *
+     * @param periodId the billing period ID
+     * @return list of EVN invoices
+     */
     public List<EvnInvoice> findByPeriodId(Long periodId) {
         return evnInvoiceRepository.findAllByPeriodId(periodId);
     }
 
+    /**
+     * Finds an EVN invoice by ID.
+     *
+     * @param id the invoice ID
+     * @return the EVN invoice
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     public EvnInvoice findById(Long id) {
         return evnInvoiceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("EvnInvoice", id));
     }
 
+    /**
+     * Creates an EVN invoice for the specified period and updates the period's total kWh and amount.
+     *
+     * @param periodId  the billing period ID
+     * @param request   invoice details (date, number, kWh, amount)
+     * @param createdBy the user performing the action
+     * @return the persisted invoice
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if the period is not found
+     * @throws com.loc.electricity.application.exception.PeriodLockedException    if the period is APPROVED or CLOSED
+     */
     @Transactional
     public EvnInvoice create(Long periodId, CreateEvnInvoiceRequest request, User createdBy) {
         BillingPeriod period = billingPeriodRepository.findById(periodId)
@@ -60,6 +87,16 @@ public class EvnInvoiceService {
         return invoice;
     }
 
+    /**
+     * Replaces all fields of an EVN invoice and re-syncs the period totals.
+     *
+     * @param id        the invoice ID
+     * @param request   new invoice fields
+     * @param updatedBy the user performing the action
+     * @return the updated invoice
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     * @throws com.loc.electricity.application.exception.PeriodLockedException    if the period is APPROVED or CLOSED
+     */
     @Transactional
     public EvnInvoice update(Long id, UpdateEvnInvoiceRequest request, User updatedBy) {
         EvnInvoice invoice = findById(id);
@@ -85,6 +122,14 @@ public class EvnInvoiceService {
         return invoice;
     }
 
+    /**
+     * Deletes an EVN invoice and re-syncs the period totals.
+     *
+     * @param id        the invoice ID
+     * @param deletedBy the user performing the action
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     * @throws com.loc.electricity.application.exception.PeriodLockedException    if the period is APPROVED or CLOSED
+     */
     @Transactional
     public void delete(Long id, User deletedBy) {
         EvnInvoice invoice = findById(id);

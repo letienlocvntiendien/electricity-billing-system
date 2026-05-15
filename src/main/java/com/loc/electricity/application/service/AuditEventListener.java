@@ -15,6 +15,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+/**
+ * Listens for {@link com.loc.electricity.domain.shared.AuditEvent}s and persists them
+ * to the {@code audit_log} table after each successful transaction commits.
+ */
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -23,6 +27,13 @@ public class AuditEventListener {
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
 
+    /**
+     * Handles an audit event by writing a new {@code audit_log} record in a separate transaction.
+     * Runs after the originating transaction commits to ensure consistency.
+     * Failures are logged but do not propagate — audit logging must never break the main flow.
+     *
+     * @param event the audit event to persist
+     */
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onAuditEvent(AuditEvent event) {

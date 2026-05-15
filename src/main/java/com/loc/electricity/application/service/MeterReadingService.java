@@ -20,6 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/**
+ * Handles submission and retrieval of meter readings for billing periods.
+ * Enforces that readings can only be submitted while the period is OPEN and
+ * applies anomaly detection against the customer's recent consumption history.
+ */
 @Service
 @RequiredArgsConstructor
 public class MeterReadingService {
@@ -28,15 +33,40 @@ public class MeterReadingService {
     private final SystemSettingService systemSettingService;
     private final ApplicationEventPublisher eventPublisher;
 
+    /**
+     * Returns all meter readings for the given billing period.
+     *
+     * @param periodId the billing period ID
+     * @return list of readings, unordered
+     */
     public List<MeterReading> findByPeriodId(Long periodId) {
         return meterReadingRepository.findAllByPeriodId(periodId);
     }
 
+    /**
+     * Finds a meter reading by ID.
+     *
+     * @param id the reading ID
+     * @return the meter reading
+     * @throws com.loc.electricity.application.exception.ResourceNotFoundException if not found
+     */
     public MeterReading findById(Long id) {
         return meterReadingRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("MeterReading", id));
     }
 
+    /**
+     * Records a meter reading for a customer. Sets {@code readAt} and {@code readBy}, then checks
+     * whether the consumption deviates significantly from the customer's recent average (anomaly detection).
+     * The reading's associated period must be in OPEN status.
+     *
+     * @param id          the meter reading ID
+     * @param request     the new current index and optional photo URL
+     * @param submittedBy the user performing the submission
+     * @return the updated reading response including any anomaly warning
+     * @throws com.loc.electricity.application.exception.BusinessException if the period is not OPEN
+     *                                                                     or currentIndex &lt; previousIndex
+     */
     @Transactional
     public MeterReadingResponse submitReading(Long id, UpdateMeterReadingRequest request, User submittedBy) {
         MeterReading reading = findById(id);
