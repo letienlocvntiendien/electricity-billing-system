@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle, Pencil, Info, AlertCircle, Search, X, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, CheckCircle2, Loader2, Zap, BarChart3, AlertTriangle, Pencil, Info, AlertCircle, Search, X, ArrowUpDown, ArrowUp, ArrowDown, MessageSquare, Download } from 'lucide-react'
 import { periodsApi } from '@/api/periods'
 import { readingsApi } from '@/api/readings'
 import { billsApi } from '@/api/bills'
@@ -401,6 +401,20 @@ export default function PeriodDetailPage() {
     }
   }
 
+  async function handlePrintPack() {
+    try {
+      const response = await periodsApi.printPack(periodId)
+      const url = URL.createObjectURL(response.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `print-pack-${period?.code}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: unknown) {
+      toast.error(apiError(e, 'Không thể tải print pack.'))
+    }
+  }
+
   async function handleViewPdf(bill: BillResponse) {
     try {
       const objectUrl = await billsApi.getPdf(bill.id)
@@ -766,6 +780,18 @@ export default function PeriodDetailPage() {
               >
                 Tạo PDF & QR
               </Button>
+              {isAccountant && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePrintPack}
+                  disabled={!bills.some(b => b.pdfUrl)}
+                  title={bills.some(b => b.pdfUrl) ? 'Tải PDF tất cả hóa đơn' : 'Chưa có PDF nào được tạo'}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  In tất cả
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="destructive"
@@ -785,13 +811,27 @@ export default function PeriodDetailPage() {
             </>
           )}
           {period.status === 'CLOSED' && isAdmin && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleGenerateBills}
-            >
-              Tạo PDF & QR
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleGenerateBills}
+              >
+                Tạo PDF & QR
+              </Button>
+              {isAccountant && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handlePrintPack}
+                  disabled={!bills.some(b => b.pdfUrl)}
+                  title={bills.some(b => b.pdfUrl) ? 'Tải PDF tất cả hóa đơn' : 'Chưa có PDF nào được tạo'}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  In tất cả
+                </Button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1358,6 +1398,7 @@ export default function PeriodDetailPage() {
                 {(period.status === 'APPROVED' || period.status === 'CLOSED') && isAccountant && (
                   <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />
+                    {/*TODO: REMOVE THIS FUNCTION*/}
                     Tự động cập nhật
                   </span>
                 )}
