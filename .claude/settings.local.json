@@ -61,7 +61,9 @@
       "Bash(Remove-Item \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\\\\infrastructure\\\\speedsms\\\\SpeedSmsClient.java\" -Force)",
       "Bash(Remove-Item \"C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\\\\infrastructure\\\\speedsms\\\\SpeedSmsResponse.java\" -Force)",
       "Bash(Remove-Item 'C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\\\\infrastructure\\\\speedsms\" -Force -Recurse *)",
-      "Bash(gh pr create --title 'Features: AWS SNS SMS, bulk SMS UI, SePay docs, UI enhancements' --body ' *)"
+      "Bash(gh pr create --title 'Features: AWS SNS SMS, bulk SMS UI, SePay docs, UI enhancements' --body ' *)",
+      "Bash(del *)",
+      "Bash(Remove-Item *)"
     ]
   }
 }

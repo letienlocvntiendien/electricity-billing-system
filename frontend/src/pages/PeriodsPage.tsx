@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, Plus, Pencil, Loader2, AlertCircle, AlertTriangle, ChevronRight, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { CalendarDays, Plus, Pencil, Loader2, AlertCircle, AlertTriangle, ChevronRight, Search, X } from 'lucide-react'
+import { SortIcon } from '@/components/SortIcon'
 import { periodsApi } from '@/api/periods'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -66,11 +67,6 @@ export default function PeriodsPage() {
   function handleSort(col: SortKey) {
     if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(col); setSortDir(col === 'startDate' || col === 'evnKwh' || col === 'unitPrice' ? 'desc' : 'asc') }
-  }
-
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />
-    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
   }
 
   const displayPeriods = useMemo(() => {
@@ -216,31 +212,31 @@ export default function PeriodsPage() {
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('name')}
                   >
-                    <span className="inline-flex items-center gap-1">Tên kỳ <SortIcon col="name" /></span>
+                    <span className="inline-flex items-center gap-1">Tên kỳ <SortIcon active={sortKey === 'name'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('startDate')}
                   >
-                    <span className="inline-flex items-center gap-1">Thời gian <SortIcon col="startDate" /></span>
+                    <span className="inline-flex items-center gap-1">Thời gian <SortIcon active={sortKey === 'startDate'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('evnKwh')}
                   >
-                    <span className="inline-flex items-center justify-end gap-1">EVN (kWh) <SortIcon col="evnKwh" /></span>
+                    <span className="inline-flex items-center justify-end gap-1">EVN (kWh) <SortIcon active={sortKey === 'evnKwh'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('unitPrice')}
                   >
-                    <span className="inline-flex items-center justify-end gap-1">Đơn giá <SortIcon col="unitPrice" /></span>
+                    <span className="inline-flex items-center justify-end gap-1">Đơn giá <SortIcon active={sortKey === 'unitPrice'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('status')}
                   >
-                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon col="status" /></span>
+                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon active={sortKey === 'status'} dir={sortDir} /></span>
                   </th>
                   {isAdmin && <th className="px-4 py-3" />}
                 </tr>

@@ -39,6 +39,7 @@ export default function PaymentsPage() {
 
   useEffect(() => {
     loadPayments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Load periods once when dialog first opens
@@ -50,6 +51,7 @@ export default function PaymentsPage() {
 
   // Load bills when period changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!selectedPeriodId) { setPeriodBills([]); setSelectedBillId(''); return }
     setBillsLoading(true)
     periodsApi
