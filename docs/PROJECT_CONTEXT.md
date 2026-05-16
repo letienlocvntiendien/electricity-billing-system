@@ -101,11 +101,11 @@ frontend/src/
 
 ---
 
-## 6. Lifecycle kỳ tính điện
+## 6. Lifecycle kỳ tính điện (PeriodStatus state machine)
 
 ```
-OPEN ──► READING_DONE ──► CALCULATED ──► APPROVED ──► CLOSED
-                               ▲                         │
+OPEN ──► READING_DONE ──► CALCULATED ─────────► APPROVED  ───────► CLOSED
+                               ▲                                      │
                                └──── revert (từ CALC hoặc APPROVED) ◄─┘
 ```
 
