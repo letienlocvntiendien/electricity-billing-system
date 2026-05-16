@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Users, Plus, Pencil, Trash2, Loader2, AlertCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { Users, Plus, Pencil, Trash2, Loader2, AlertCircle, Search, X } from 'lucide-react'
+import { SortIcon } from '@/components/SortIcon'
 import { customersApi } from '@/api/customers'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -64,11 +65,6 @@ export default function CustomersPage() {
   function handleSort(col: SortKey) {
     if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(col); setSortDir('asc') }
-  }
-
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />
-    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
   }
 
   const displayCustomers = useMemo(() => {
@@ -224,13 +220,13 @@ export default function CustomersPage() {
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('code')}
                   >
-                    <span className="inline-flex items-center gap-1">Mã KH <SortIcon col="code" /></span>
+                    <span className="inline-flex items-center gap-1">Mã KH <SortIcon active={sortKey === 'code'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('fullName')}
                   >
-                    <span className="inline-flex items-center gap-1">Họ tên <SortIcon col="fullName" /></span>
+                    <span className="inline-flex items-center gap-1">Họ tên <SortIcon active={sortKey === 'fullName'} dir={sortDir} /></span>
                   </th>
                   <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Điện thoại</th>
                   <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">Số đồng hồ</th>
@@ -238,7 +234,7 @@ export default function CustomersPage() {
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('active')}
                   >
-                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon col="active" /></span>
+                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon active={sortKey === 'active'} dir={sortDir} /></span>
                   </th>
                   {isAdmin && <th className="px-4 py-3" />}
                 </tr>

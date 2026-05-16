@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FileText, AlertTriangle, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react'
+import { FileText, AlertTriangle, Search, X } from 'lucide-react'
+import { SortIcon } from '@/components/SortIcon'
 import client from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -37,11 +38,6 @@ export default function ReportsPage() {
   function handleSort(col: SortKey) {
     if (sortKey === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortKey(col); setSortDir(col === 'remaining' || col === 'total' ? 'desc' : 'asc') }
-  }
-
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ArrowUpDown className="h-3 w-3 opacity-40" />
-    return sortDir === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
   }
 
   const displayBills = useMemo(() => {
@@ -161,31 +157,31 @@ export default function ReportsPage() {
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('customer')}
                   >
-                    <span className="inline-flex items-center gap-1">Khách hàng <SortIcon col="customer" /></span>
+                    <span className="inline-flex items-center gap-1">Khách hàng <SortIcon active={sortKey === 'customer'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('period')}
                   >
-                    <span className="inline-flex items-center gap-1">Kỳ <SortIcon col="period" /></span>
+                    <span className="inline-flex items-center gap-1">Kỳ <SortIcon active={sortKey === 'period'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('total')}
                   >
-                    <span className="inline-flex items-center justify-end gap-1">Tổng tiền <SortIcon col="total" /></span>
+                    <span className="inline-flex items-center justify-end gap-1">Tổng tiền <SortIcon active={sortKey === 'total'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-right px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('remaining')}
                   >
-                    <span className="inline-flex items-center justify-end gap-1">Còn lại <SortIcon col="remaining" /></span>
+                    <span className="inline-flex items-center justify-end gap-1">Còn lại <SortIcon active={sortKey === 'remaining'} dir={sortDir} /></span>
                   </th>
                   <th
                     className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground cursor-pointer hover:text-foreground select-none"
                     onClick={() => handleSort('status')}
                   >
-                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon col="status" /></span>
+                    <span className="inline-flex items-center gap-1">Trạng thái <SortIcon active={sortKey === 'status'} dir={sortDir} /></span>
                   </th>
                 </tr>
               </thead>
