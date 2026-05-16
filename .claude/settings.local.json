@@ -63,7 +63,14 @@
       "Bash(Remove-Item 'C:\\\\Users\\\\as\\\\Development\\\\back_end_projects\\\\electricity-billing-system\\\\src\\\\main\\\\java\\\\com\\\\loc\\\\electricity\\\\infrastructure\\\\speedsms\" -Force -Recurse *)",
       "Bash(gh pr create --title 'Features: AWS SNS SMS, bulk SMS UI, SePay docs, UI enhancements' --body ' *)",
       "Bash(del *)",
-      "Bash(Remove-Item *)"
+      "Bash(Remove-Item *)",
+      "Bash(xargs basename -a)",
+      "Bash(Sort-Object)",
+      "Bash(./mvnw help:evaluate -Dexpression=project.parent.version -q -DforceStdout)",
+      "Bash(jar tf *)",
+      "Bash(./mvnw -Dtest=BillGenerationServiceTest test)",
+      "Bash(Select-String -Pattern \"\\(FAILED|ERROR|Tests run|BUILD\\)\")",
+      "Bash(Select-Object -Last 60)"
     ]
   }
 }
