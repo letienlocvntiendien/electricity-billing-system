@@ -1,7 +1,36 @@
-import { AlertTriangle, BarChart3, CheckCircle2, Download, Loader2 } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, Download, Info, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import type { BillResponse, PeriodResponse } from '@/types/api'
+
+function getStatusMessage(
+  status: PeriodResponse['status'],
+  isAdmin: boolean,
+  isAccountant: boolean,
+  accountantVerifiedAt: string | null | undefined,
+): string | null {
+  const isMeterReader = !isAccountant
+  if (status === 'OPEN') {
+    if (isMeterReader) return 'Cần nhập chỉ số đồng hồ và bấm "Hoàn thành kỳ này"'
+    return 'Đang chờ người đọc đồng hồ nhập và xác nhận chỉ số'
+  }
+  if (status === 'READING_DONE') {
+    if (isMeterReader) return 'Đã xác nhận chỉ số xong, đang chờ kế toán xử lý'
+    if (isAccountant && !isAdmin) return 'Chỉ số đã đủ, có thể tính tiền cho kỳ này'
+    return 'Đang chờ kế toán tính tiền'
+  }
+  if (status === 'CALCULATED') {
+    if (isMeterReader) return accountantVerifiedAt ? 'Đang chờ Admin phê duyệt' : 'Đang chờ kế toán và Admin xử lý'
+    if (isAccountant && !isAdmin) return accountantVerifiedAt ? 'Đã đối chiếu, đang chờ Admin phê duyệt' : 'Cần đối chiếu với hóa đơn EVN để Admin có thể phê duyệt'
+    return accountantVerifiedAt ? 'Kế toán đã đối chiếu, có thể phê duyệt kỳ này' : 'Đang chờ kế toán đối chiếu với hóa đơn EVN'
+  }
+  if (status === 'APPROVED') {
+    if (isMeterReader) return 'Kỳ đã được phê duyệt'
+    if (isAccountant && !isAdmin) return 'Kỳ đã được phê duyệt, có thể in và gửi hóa đơn cho khách hàng'
+    return 'Kỳ đã được phê duyệt, có thể đóng kỳ sau khi hoàn tất gửi hóa đơn'
+  }
+  return null
+}
 
 interface Props {
   period: PeriodResponse
@@ -23,9 +52,11 @@ export function PeriodActionBar({
 }: Props) {
   const canAddInvoice = isAccountant && !['APPROVED', 'CLOSED'].includes(period.status)
   const hasPdfs = bills.some((b) => b.pdfUrl)
+  const statusMessage = getStatusMessage(period.status, isAdmin, isAccountant, period.accountantVerifiedAt)
 
   const showBar =
     canAddInvoice ||
+    period.status === 'OPEN' ||
     period.status === 'READING_DONE' ||
     period.status === 'CALCULATED' ||
     period.status === 'APPROVED' ||
@@ -166,6 +197,13 @@ export function PeriodActionBar({
             </Button>
           )}
         </>
+      )}
+
+      {statusMessage && (
+        <div className="w-full flex items-center gap-1.5 text-xs text-muted-foreground pt-0.5">
+          <Info className="h-3.5 w-3.5 shrink-0" />
+          <span>{statusMessage}</span>
+        </div>
       )}
     </div>
   )

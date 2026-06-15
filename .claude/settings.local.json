@@ -70,7 +70,8 @@
       "Bash(jar tf *)",
       "Bash(./mvnw -Dtest=BillGenerationServiceTest test)",
       "Bash(Select-String -Pattern \"\\(FAILED|ERROR|Tests run|BUILD\\)\")",
-      "Bash(Select-Object -Last 60)"
+      "Bash(Select-Object -Last 60)",
+      "Bash(grep -E \"\\\\.\\(properties|yml|yaml\\)$\")"
     ]
   }
 }

@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Spring Boot Application (Chạy đơn lẻ kết nối Cloud DB)
+  electricity-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: electricity-app
+    restart: always
+    ports:
+      - "${PORT}:8080"
+    environment:
+      # Spring profiles
+      SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE}"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+
+      # Database connection (Đọc động hoàn toàn từ các biến mới trong file .env)
+      DB_HOST: "${DB_HOST}"
+      DB_PORT: "${DB_PORT}"
+      DB_NAME: "${DB_NAME}"
+      DB_USERNAME: "${DB_USERNAME}"
+      DB_PASSWORD: "${DB_PASSWORD}"
+
+      # JWT
+      JWT_SECRET: "${JWT_SECRET}"
+
+      # SePay webhook
+      SEPAY_WEBHOOK_SECRET: "${SEPAY_WEBHOOK_SECRET}"
+
+      # File uploads
+      UPLOAD_DIR: "${UPLOAD_DIR}"
+
+      # AWS SNS (optional)
+      AWS_REGION: "${AWS_REGION}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY}"
+      AWS_SNS_SMS_TYPE: "${AWS_SNS_SMS_TYPE}"
+
+    volumes:
+      - app_uploads:/app/uploads
+
+    networks:
+      - electricity-network
+
+volumes:
+  app_uploads:
+
+networks:
+  electricity-network:
+    driver: bridge
