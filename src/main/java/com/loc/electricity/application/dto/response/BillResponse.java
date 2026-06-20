@@ -10,6 +10,7 @@ public record BillResponse(
         Long id,
         Long periodId,
         String periodCode,
+        String periodName,
         Long customerId,
         String customerCode,
         String customerName,
@@ -31,7 +32,7 @@ public record BillResponse(
 ) {
     public static BillResponse from(Bill b) {
         return new BillResponse(
-                b.getId(), b.getPeriod().getId(), b.getPeriod().getCode(),
+                b.getId(), b.getPeriod().getId(), b.getPeriod().getCode(), b.getPeriod().getName(),
                 b.getCustomer().getId(), b.getCustomer().getCode(), b.getCustomer().getFullName(),
                 b.getCustomer().getPhone(),
                 b.getConsumption(), b.getUnitPrice(), b.getServiceFee(),
