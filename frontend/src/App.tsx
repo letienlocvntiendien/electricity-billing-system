@@ -10,6 +10,8 @@ import PeriodDetailPage from '@/pages/period-detail'
 import ReportsPage from '@/pages/ReportsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import PaymentsPage from '@/pages/PaymentsPage'
+import CustomerDebtPage from '@/pages/CustomerDebtPage'
+import CustomerHistoryPage from '@/pages/CustomerHistoryPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
@@ -37,8 +39,10 @@ function AppRoutes() {
         <Route path="periods" element={<PeriodsPage />} />
         <Route path="periods/:id" element={<PeriodDetailPage />} />
         <Route path="customers" element={<CustomersPage />} />
+        <Route path="customers/:id" element={<CustomerHistoryPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="payments" element={<PaymentsPage />} />
+        <Route path="customers-debt" element={<CustomerDebtPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

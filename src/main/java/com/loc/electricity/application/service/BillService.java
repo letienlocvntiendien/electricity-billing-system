@@ -1,5 +1,6 @@
 package com.loc.electricity.application.service;
 
+import com.loc.electricity.application.dto.response.BillResponse;
 import com.loc.electricity.application.exception.BusinessException;
 import com.loc.electricity.application.exception.ResourceNotFoundException;
 import com.loc.electricity.domain.bill.Bill;
@@ -34,6 +35,17 @@ public class BillService {
      */
     public List<Bill> findByPeriodId(Long periodId) {
         return billRepository.findAllByPeriodId(periodId);
+    }
+
+    /**
+     * Returns all bills for the given customer across all periods, sorted newest first.
+     *
+     * @param customerId the customer ID
+     * @return list of bill responses sorted by period start date descending
+     */
+    public List<BillResponse> getBillsByCustomer(Long customerId) {
+        return billRepository.findAllByCustomerIdOrderByPeriodStartDateDesc(customerId)
+                .stream().map(BillResponse::from).toList();
     }
     /**
      * Finds a bill by ID.

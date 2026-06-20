@@ -1,0 +1,365 @@
+#!/usr/bin/env python3
+"""
+generate_v14_2026.py
+
+Generates V14__import_2026_periods.sql which:
+  1. Deletes demo periods 2026-05 and 2026-06 (and their related data)
+  2. Adds 2 new customers: KH156 (Sáu Lực 2), KH157 (Sang 2)
+  3. Imports 3 real periods from docs/data/ElectricityManagement.xlsx:
+       T3-2026 → 2026-03  (69 customers, unit_price=2805, service_fee=25000)
+       T4-2026 → 2026-04  (71 customers, unit_price=3656, service_fee=25000)
+       T5-2026 → 2026-05  (71 customers, unit_price=3230, service_fee=25000)
+
+Run AFTER V13 has been applied.
+
+Usage:
+    python3 scripts/generate_v14_2026.py
+"""
+
+import os, calendar
+from datetime import date, datetime
+from collections import Counter
+
+try:
+    import openpyxl
+except ImportError:
+    raise SystemExit("Run: python3 -m pip install openpyxl")
+
+BASE_DIR     = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EXCEL_OLD    = os.path.join(BASE_DIR, "docs", "data",
+               "clean_data_migration_workbook2020_2026.xlsx")
+EXCEL_NEW    = os.path.join(BASE_DIR, "docs", "data", "ElectricityManagement.xlsx")
+OUTPUT_PATH  = os.path.join(BASE_DIR, "src", "main", "resources", "db", "migration",
+               "V14__import_2026_periods.sql")
+
+# Demo periods to delete before importing real data
+DEMO_PERIODS_TO_DELETE = ["2026-05", "2026-06"]
+
+# New customers not in the existing clean_data workbook
+NEW_CUSTOMERS = [
+    ("KH156", "Sáu Lực 2"),
+    ("KH157", "Sang 2"),
+]
+
+# Sheet → period code mapping
+SHEET_PERIOD = {
+    "T3-2026": "2026-03",
+    "T4-2026": "2026-04",
+    "T5-2026": "2026-05",
+}
+
+
+# ─────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────
+
+def sql_str(v):
+    if v is None: return "NULL"
+    return "'" + str(v).replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+def to_int(v, default=0):
+    if v is None: return default
+    try: return int(float(v))
+    except: return default
+
+def to_float(v, default=0.0):
+    if v is None: return default
+    try: return float(v)
+    except: return default
+
+def round0(v): return round(to_float(v))
+
+def period_end_date(period_code: str) -> date:
+    y, m = int(period_code[:4]), int(period_code[5:7])
+    last = calendar.monthrange(y, m)[1]
+    return date(y, m, last)
+
+def period_name(period_code: str) -> str:
+    y, m = int(period_code[:4]), int(period_code[5:7])
+    return f"Kỳ tháng {m:02d}/{y}"
+
+
+# ─────────────────────────────────────────────────────────────
+# Load customer name → code mapping
+# ─────────────────────────────────────────────────────────────
+
+print("Loading customer map from clean_data workbook …")
+wb_cd = openpyxl.load_workbook(EXCEL_OLD, read_only=True, data_only=True)
+ws_cust = wb_cd["customers"]
+name_to_code: dict[str, str] = {}
+for r in list(ws_cust.iter_rows(values_only=True))[1:]:
+    code, name, variants = r[0], r[1], r[2]
+    if not code or not name:
+        continue
+    name_to_code[name.strip().lower()] = code
+    if variants:
+        for v in str(variants).split("|"):
+            name_to_code[v.strip().lower()] = code
+wb_cd.close()
+
+# Add new customers
+for code, name in NEW_CUSTOMERS:
+    name_to_code[name.strip().lower()] = code
+
+print(f"  Customer map: {len(name_to_code)} entries")
+
+
+def resolve_customer(raw_name: str) -> str | None:
+    """Normalize whitespace then look up customer code."""
+    if not raw_name:
+        return None
+    normalized = " ".join(raw_name.strip().split())   # collapse multiple spaces
+    return name_to_code.get(normalized.lower())
+
+
+# ─────────────────────────────────────────────────────────────
+# Read ElectricityManagement.xlsx
+# ─────────────────────────────────────────────────────────────
+
+print(f"Reading {EXCEL_NEW} …")
+wb_new = openpyxl.load_workbook(EXCEL_NEW, read_only=True, data_only=True)
+
+sheets_data: dict[str, list] = {}
+for sheet_name in wb_new.sheetnames:
+    if sheet_name not in SHEET_PERIOD:
+        print(f"  Skipping unknown sheet: {sheet_name}")
+        continue
+    ws = wb_new[sheet_name]
+    rows = list(ws.iter_rows(values_only=True))[1:]  # skip header
+    data_rows = []
+    for r in rows:
+        # Skip rows without a valid STT number
+        if r[0] is None:
+            continue
+        try:
+            int(float(r[0]))
+        except (TypeError, ValueError):
+            continue
+        # Skip rows with no name or no useful data (all-None after STT)
+        if not r[1] or (r[2] is None and r[3] is None and r[4] is None):
+            continue
+        data_rows.append(r)
+    sheets_data[sheet_name] = data_rows
+    print(f"  {sheet_name}: {len(data_rows)} data rows")
+
+wb_new.close()
+
+
+# ─────────────────────────────────────────────────────────────
+# Build SQL
+# ─────────────────────────────────────────────────────────────
+
+lines = []
+
+# ── Header ────────────────────────────────────────────────
+total_rows = sum(len(v) for v in sheets_data.values())
+lines += [
+    "-- " + "═" * 62,
+    "-- V14__import_2026_periods.sql",
+    "-- Generated by scripts/generate_v14_2026.py",
+    f"-- Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+    "--",
+    f"-- 1. Delete demo periods: {', '.join(DEMO_PERIODS_TO_DELETE)}",
+    f"-- 2. Insert new customers: {', '.join(c for c, _ in NEW_CUSTOMERS)}",
+    f"-- 3. Import {len(sheets_data)} periods from ElectricityManagement.xlsx",
+    f"--    Total data rows: {total_rows}",
+    "--",
+    "-- Depends on: V10 through V13 (must be applied first)",
+    "-- " + "═" * 62,
+    "",
+    "SET NAMES utf8mb4;",
+    "SET FOREIGN_KEY_CHECKS = 0;",
+]
+
+# ── STEP 1: Delete demo periods ───────────────────────────
+demo_codes_sql = ", ".join(sql_str(p) for p in DEMO_PERIODS_TO_DELETE)
+lines += [
+    "",
+    "-- " + "─" * 62,
+    f"-- STEP 1: Delete demo periods ({', '.join(DEMO_PERIODS_TO_DELETE)})",
+    "-- " + "─" * 62,
+    "",
+    f"DELETE FROM payment WHERE bill_id IN ("
+    f" SELECT id FROM bill WHERE period_id IN ("
+    f" SELECT id FROM billing_period WHERE code IN ({demo_codes_sql})));",
+    "",
+    f"DELETE FROM sms_log WHERE bill_id IN ("
+    f" SELECT id FROM bill WHERE period_id IN ("
+    f" SELECT id FROM billing_period WHERE code IN ({demo_codes_sql})));",
+    "",
+    f"DELETE FROM bill WHERE period_id IN ("
+    f" SELECT id FROM billing_period WHERE code IN ({demo_codes_sql}));",
+    "",
+    f"DELETE FROM meter_reading WHERE period_id IN ("
+    f" SELECT id FROM billing_period WHERE code IN ({demo_codes_sql}));",
+    "",
+    f"DELETE FROM evn_invoice WHERE period_id IN ("
+    f" SELECT id FROM billing_period WHERE code IN ({demo_codes_sql}));",
+    "",
+    f"DELETE FROM billing_period WHERE code IN ({demo_codes_sql});",
+]
+
+# ── STEP 2: New customers ─────────────────────────────────
+lines += [
+    "",
+    "-- " + "─" * 62,
+    "-- STEP 2: Add new customers",
+    "-- " + "─" * 62,
+]
+for code, name in NEW_CUSTOMERS:
+    safe_name = name.replace("'", "\\'")
+    lines.append(
+        f"INSERT IGNORE INTO customer (code, full_name, active, created_at, updated_at) "
+        f"VALUES ('{code}', '{safe_name}', TRUE, NOW(), NOW());"
+    )
+
+# ── STEP 3: Import each period ────────────────────────────
+stats = []
+unmatched_names: set[str] = set()
+
+for sheet_name, period_code in SHEET_PERIOD.items():
+    if sheet_name not in sheets_data:
+        continue
+
+    rows = sheets_data[sheet_name]
+    end_dt   = period_end_date(period_code)
+    ed       = end_dt.strftime("%Y-%m-%d")
+    sd       = date(end_dt.year, end_dt.month, 1).strftime("%Y-%m-%d")
+    read_at  = f"{ed} 12:00:00"
+    p_name   = period_name(period_code)
+
+    # Aggregate period-level fields
+    unit_prices  = [to_float(r[5]) for r in rows if r[5] is not None]
+    service_fees = [to_float(r[7]) for r in rows if r[7] is not None]
+    unit_price   = Counter(unit_prices).most_common(1)[0][0] if unit_prices else 0.0
+    service_fee  = Counter(service_fees).most_common(1)[0][0] if service_fees else 0.0
+    total_kwh    = sum(to_int(r[4]) for r in rows if r[4] is not None and to_float(r[4]) > 0)
+    evn_amount   = round(unit_price * total_kwh, 2)
+    inv_num      = f"HIST-{period_code}"
+
+    lines += [
+        "",
+        "-- " + "─" * 62,
+        f"-- Period {period_code}  ({p_name})  ← sheet {sheet_name}",
+        f"-- Customers: {len(rows)}  |  unit_price: {unit_price}  |  service_fee: {service_fee}",
+        f"-- total_kwh: {total_kwh}  |  evn_amount: {evn_amount}",
+        "-- " + "─" * 62,
+    ]
+
+    # billing_period
+    lines.append(
+        f"INSERT IGNORE INTO billing_period "
+        f"(code, name, start_date, end_date, unit_price, service_fee, extra_fee, "
+        f"evn_total_kwh, evn_total_amount, status, closed_at, created_at, updated_at) VALUES ("
+        f"{sql_str(period_code)}, {sql_str(p_name)}, '{sd}', '{ed}', "
+        f"{unit_price}, {service_fee}, 0, "
+        f"{total_kwh}, {evn_amount}, "
+        f"'CLOSED', '{ed} 23:59:59', NOW(), NOW());"
+    )
+
+    # evn_invoice
+    lines.append(
+        f"INSERT INTO evn_invoice (period_id, invoice_date, invoice_number, kwh, amount, created_at) "
+        f"SELECT bp.id, '{ed}', {sql_str(inv_num)}, {total_kwh}, {evn_amount}, NOW() "
+        f"FROM billing_period bp "
+        f"WHERE bp.code = {sql_str(period_code)} "
+        f"AND NOT EXISTS (SELECT 1 FROM evn_invoice ei WHERE ei.period_id = bp.id);"
+    )
+
+    # meter_readings + bills
+    lines.append("-- Meter readings")
+    mr_count = 0
+    skipped  = 0
+    for r in rows:
+        raw_name      = str(r[1]).strip() if r[1] else None
+        customer_code = resolve_customer(raw_name)
+        if not customer_code:
+            unmatched_names.add(raw_name or "")
+            skipped += 1
+            continue
+
+        prev = to_int(r[2], 0)
+        curr = to_int(r[3], prev)
+        cons = to_int(r[4])
+
+        if curr < prev:
+            # Meter replacement: reset to 0
+            prev = 0
+            curr = cons
+
+        lines.append(
+            f"INSERT IGNORE INTO meter_reading "
+            f"(period_id, customer_id, previous_index, current_index, read_at, created_at, updated_at) "
+            f"SELECT bp.id, c.id, {prev}, {curr}, "
+            f"'{read_at}', NOW(), NOW() "
+            f"FROM billing_period bp, customer c "
+            f"WHERE bp.code = {sql_str(period_code)} AND c.code = {sql_str(customer_code)};"
+        )
+        mr_count += 1
+
+    lines.append("-- Bills")
+    bill_count = 0
+    for r in rows:
+        raw_name      = str(r[1]).strip() if r[1] else None
+        customer_code = resolve_customer(raw_name)
+        if not customer_code:
+            continue
+
+        prev        = to_int(r[2], 0)
+        curr        = to_int(r[3], prev)
+        cons        = to_int(r[4])
+        up          = to_float(r[5]) or unit_price
+        sf          = to_float(r[7]) if r[7] is not None else service_fee
+        elec        = round0(r[6]) if r[6] is not None else round(cons * up)
+        total       = round0(r[8]) if r[8] is not None else (elec + round(sf))
+        payment_c   = f"TIENDIEN {period_code} {customer_code}"
+
+        if curr < prev:
+            cons = to_int(r[4])   # use original cons_excel
+
+        lines.append(
+            f"INSERT IGNORE INTO bill "
+            f"(period_id, customer_id, consumption, unit_price, service_fee, "
+            f"electricity_amount, service_amount, total_amount, paid_amount, "
+            f"status, payment_code, sent_via_zalo, created_at, updated_at) "
+            f"SELECT bp.id, c.id, {cons}, {up}, {sf}, "
+            f"{elec}, {round(sf)}, {total}, {total}, "
+            f"'PAID', {sql_str(payment_c)}, FALSE, NOW(), NOW() "
+            f"FROM billing_period bp, customer c "
+            f"WHERE bp.code = {sql_str(period_code)} AND c.code = {sql_str(customer_code)};"
+        )
+        bill_count += 1
+
+    stats.append((period_code, p_name, len(rows), mr_count, bill_count, skipped))
+
+lines += ["", "SET FOREIGN_KEY_CHECKS = 1;", ""]
+
+# ─────────────────────────────────────────────────────────────
+# Write output
+# ─────────────────────────────────────────────────────────────
+
+content = "\n".join(lines)
+with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+    f.write(content)
+
+# Summary (ASCII only to avoid console encoding issues)
+print()
+print("=" * 55)
+print("  V14 Summary")
+print("=" * 55)
+print(f"  Demo periods deleted: {', '.join(DEMO_PERIODS_TO_DELETE)}")
+print(f"  New customers added:  {len(NEW_CUSTOMERS)}")
+print()
+for period_code, p_name, total, mr, bill, skipped in stats:
+    print(f"  {period_code}: {total} rows -> {mr} MR + {bill} bills  (skip={skipped})")
+print()
+if unmatched_names:
+    print(f"  UNMATCHED names (skipped): {unmatched_names}")
+else:
+    print("  All names matched.")
+print()
+none_count = content.count(", None,") + content.count("= None,")
+print(f"  None literals in SQL: {none_count}")
+print(f"  Output: {OUTPUT_PATH}")
+print(f"  File size: {len(content.encode('utf-8')):,} bytes")
+print("=" * 55)

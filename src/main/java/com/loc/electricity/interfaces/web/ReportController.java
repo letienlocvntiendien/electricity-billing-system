@@ -2,6 +2,7 @@ package com.loc.electricity.interfaces.web;
 
 import com.loc.electricity.application.dto.response.ApiResponse;
 import com.loc.electricity.application.dto.response.BillResponse;
+import com.loc.electricity.application.dto.response.CustomerDebtSummaryResponse;
 import com.loc.electricity.application.dto.response.PeriodSummaryResponse;
 import com.loc.electricity.application.service.ReportService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,18 @@ public class ReportController {
         List<BillResponse> response = reportService.getDebtReport()
                 .stream().map(BillResponse::from).toList();
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    /**
+     * {@code GET /api/reports/customers-debt} — Returns all customers with outstanding debt,
+     * grouped and sorted by total outstanding amount descending.
+     *
+     * @return list of customer debt summaries including per-period bill detail
+     */
+    @GetMapping("/customers-debt")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<List<CustomerDebtSummaryResponse>>> customerDebtSummaries() {
+        return ResponseEntity.ok(ApiResponse.ok(reportService.getCustomerDebtSummaries()));
     }
 
     /**

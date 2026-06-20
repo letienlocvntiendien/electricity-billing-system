@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, CalendarDays, FileText,
-  Settings, LogOut, Zap, Banknote,
+  Settings, LogOut, Zap, Banknote, TrendingDown,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { cn } from '@/lib/utils'
@@ -23,8 +23,9 @@ const navItems = [
   { to: '/periods',   label: 'Kỳ điện',       icon: CalendarDays },
   { to: '/customers', label: 'Khách hàng',    icon: Users,          accountantOnly: true },
   { to: '/reports',   label: 'Báo cáo',       icon: FileText,       accountantOnly: true },
-  { to: '/payments',  label: 'Thanh toán',    icon: Banknote,       accountantOnly: true },
-  { to: '/settings',  label: 'Cài đặt',       icon: Settings,       adminOnly: true },
+  { to: '/payments',       label: 'Thanh toán',    icon: Banknote,       accountantOnly: true },
+  { to: '/customers-debt', label: 'Công nợ KH',   icon: TrendingDown,   accountantOnly: true },
+  { to: '/settings',       label: 'Cài đặt',       icon: Settings,       adminOnly: true },
 ]
 
 export default function AppLayout() {
