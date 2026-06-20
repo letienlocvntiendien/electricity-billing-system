@@ -40,7 +40,7 @@ import java.util.List;
  *   reader      / Reader@123
  */
 @Component
-@Profile("dev | local")
+@Profile("dev | local | prod")
 @RequiredArgsConstructor
 @Slf4j
 public class DataInitializer implements ApplicationRunner {
@@ -66,32 +66,27 @@ public class DataInitializer implements ApplicationRunner {
 
         User admin = userRepository.save(User.builder()
                 .username("admin")
-                .passwordHash(passwordEncoder.encode("Admin@123"))
+                .passwordHash(passwordEncoder.encode("admin@123"))
                 .fullName("Quản trị viên")
                 .role(Role.ADMIN)
                 .build());
 
         User accountant = userRepository.save(User.builder()
                 .username("accountant")
-                .passwordHash(passwordEncoder.encode("Account@123"))
-                .fullName("Kế toán Nguyễn Thị Hoa")
+                .passwordHash(passwordEncoder.encode("leluc@123"))
+                .fullName("Kế toán Lê Văn Lực")
                 .role(Role.ACCOUNTANT)
                 .build());
 
         User reader = userRepository.save(User.builder()
                 .username("reader")
-                .passwordHash(passwordEncoder.encode("Reader@123"))
-                .fullName("Thợ đọc đồng hồ Trần Văn Minh")
+                .passwordHash(passwordEncoder.encode("levandanh@123"))
+                .fullName("Thợ đọc đồng hồ Lê Văn Danh")
                 .role(Role.METER_READER)
                 .build());
 
-        List<Customer> customers = seedCustomers();
-        seedSystemSettings();
-        seedPeriod1(customers, admin, accountant, reader);
-        seedPeriod2(customers, admin, accountant, reader);
-        seedPeriod3(customers, reader);
 
-        log.info("[DataInitializer] Dev seed complete — admin/Admin@123 · accountant/Account@123 · reader/Reader@123");
+        log.info("[DataInitializer] Init data successfully ...");
     }
 
     // ── Customers ────────────────────────────────────────────────────────────

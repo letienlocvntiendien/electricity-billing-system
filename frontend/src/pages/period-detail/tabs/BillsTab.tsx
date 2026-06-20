@@ -34,14 +34,13 @@ interface Props {
 }
 
 export function BillsTab({
-  period, bills, displayBills, showBillActions, isAccountant,
+  bills, displayBills, showBillActions, isAccountant,
   selectedBillIds, setSelectedBillIds, sendingSms,
   billSearch, setBillSearch, billStatusFilter, setBillStatusFilter,
   billSort, toggleSort,
   onPaymentForm, onMarkSent, onZaloLink, onViewPdf, onSendSms,
   setPaymentBill, setPaymentForm,
 }: Props) {
-  const isPolling = (period.status === 'APPROVED' || period.status === 'CLOSED') && isAccountant
 
   return (
     <div className="rounded-lg border bg-card">
@@ -50,12 +49,6 @@ export function BillsTab({
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold">Hóa đơn khách hàng</span>
-            {isPolling && (
-              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Tự động cập nhật
-              </span>
-            )}
           </div>
           <div className="flex items-center gap-2">
             {(billSearch || billStatusFilter !== 'ALL') && (
