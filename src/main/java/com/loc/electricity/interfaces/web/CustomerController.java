@@ -3,7 +3,9 @@ package com.loc.electricity.interfaces.web;
 import com.loc.electricity.application.dto.request.CreateCustomerRequest;
 import com.loc.electricity.application.dto.request.UpdateCustomerRequest;
 import com.loc.electricity.application.dto.response.ApiResponse;
+import com.loc.electricity.application.dto.response.BillResponse;
 import com.loc.electricity.application.dto.response.CustomerResponse;
+import com.loc.electricity.application.service.BillService;
 import com.loc.electricity.application.service.CustomerService;
 import com.loc.electricity.domain.user.User;
 import com.loc.electricity.interfaces.security.CurrentUser;
@@ -17,6 +19,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * REST controller for customer management. Requires ADMIN, ACCOUNTANT, or METER_READER role
  * depending on the operation. Write operations (create/update/delete) are ADMIN-only.
@@ -27,6 +31,7 @@ import org.springframework.web.bind.annotation.*;
 public class CustomerController {
 
     private final CustomerService customerService;
+    private final BillService billService;
 
     /**
      * {@code GET /api/customers} — Returns a paginated list of customers.
@@ -56,6 +61,20 @@ public class CustomerController {
     @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
     public ResponseEntity<ApiResponse<CustomerResponse>> get(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.ok(CustomerResponse.from(customerService.findById(id))));
+    }
+
+    /**
+     * {@code GET /api/customers/{id}/bills} — Returns all bills for a customer across all periods,
+     * sorted by period start date descending. Roles: ADMIN, ACCOUNTANT.
+     *
+     * @param id the customer ID
+     * @return list of bills newest-first
+     */
+    @GetMapping("/{id}/bills")
+    @PreAuthorize("hasAnyRole('ADMIN','ACCOUNTANT')")
+    public ResponseEntity<ApiResponse<List<BillResponse>>> getCustomerBills(@PathVariable Long id) {
+        customerService.findById(id);
+        return ResponseEntity.ok(ApiResponse.ok(billService.getBillsByCustomer(id)));
     }
 
     /**

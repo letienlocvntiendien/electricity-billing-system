@@ -140,6 +140,7 @@ export interface BillResponse {
   id: number
   periodId: number
   periodCode: string
+  periodName: string
   customerId: number
   customerCode: string
   customerName: string
@@ -213,6 +214,20 @@ export interface PeriodReviewResponse {
 }
 
 // ── Reports ───────────────────────────────────────────────────────────────────
+
+export interface CustomerDebtSummaryResponse {
+  customerId: number
+  customerCode: string
+  customerName: string
+  customerPhone: string | null
+  unpaidBillCount: number
+  oldestUnpaidPeriodName: string
+  totalBilledAmount: number
+  totalPaidAmount: number
+  totalOutstanding: number
+  worstStatus: BillStatus
+  bills: BillResponse[]
+}
 
 export interface PeriodSummaryResponse {
   periodId: number

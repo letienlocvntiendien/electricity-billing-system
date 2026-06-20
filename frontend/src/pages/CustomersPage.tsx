@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Users, Plus, Pencil, Trash2, Loader2, AlertCircle, Search, X } from 'lucide-react'
 import { SortIcon } from '@/components/SortIcon'
 import { customersApi } from '@/api/customers'
@@ -21,6 +22,7 @@ type StatusFilter = 'all' | 'active' | 'inactive'
 
 export default function CustomersPage() {
   const { isAdmin } = useAuth()
+  const navigate = useNavigate()
   const toast = useToast()
   const [customers, setCustomers] = useState<CustomerResponse[]>([])
   const [loading, setLoading] = useState(true)
@@ -243,8 +245,9 @@ export default function CustomersPage() {
                 {displayCustomers.map((c, i) => (
                   <tr
                     key={c.id}
-                    className="data-row hover:bg-accent/40 transition-colors"
+                    className="data-row hover:bg-accent/40 transition-colors cursor-pointer"
                     style={i < displayCustomers.length - 1 ? { borderBottom: '1px solid hsl(var(--border) / 0.6)' } : {}}
+                    onClick={() => navigate(`/customers/${c.id}`)}
                   >
                     <td className="px-4 py-3 font-mono text-sm font-semibold text-primary">{c.code}</td>
                     <td className="px-4 py-3 text-foreground">{c.fullName}</td>
@@ -259,14 +262,14 @@ export default function CustomersPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
                           <button
-                            onClick={() => openEdit(c)}
+                            onClick={(e) => { e.stopPropagation(); openEdit(c) }}
                             className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent/60 transition-colors"
                             title="Chỉnh sửa"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
                           <button
-                            onClick={() => handleDelete(c)}
+                            onClick={(e) => { e.stopPropagation(); handleDelete(c) }}
                             className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                             title="Xóa"
                           >

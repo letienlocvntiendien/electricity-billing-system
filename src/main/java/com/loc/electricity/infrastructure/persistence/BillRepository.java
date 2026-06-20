@@ -37,4 +37,7 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
 
     @Query("SELECT b FROM Bill b JOIN FETCH b.customer JOIN FETCH b.period WHERE b.id IN :ids")
     List<Bill> findAllByIdIn(@Param("ids") List<Long> ids);
+
+    @Query("SELECT b FROM Bill b JOIN FETCH b.period JOIN FETCH b.customer WHERE b.customer.id = :customerId ORDER BY b.period.startDate DESC")
+    List<Bill> findAllByCustomerIdOrderByPeriodStartDateDesc(@Param("customerId") Long customerId);
 }
