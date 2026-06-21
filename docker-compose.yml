@@ -13,7 +13,7 @@ services:
     environment:
       # Spring profiles
       SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE}"
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
 
       # Database connection (Đọc động hoàn toàn từ các biến mới trong file .env)
       DB_HOST: "${DB_HOST}"
