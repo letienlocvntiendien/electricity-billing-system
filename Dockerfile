@@ -13,6 +13,8 @@ WORKDIR /app
 COPY pom.xml ./
 RUN mvn dependency:go-offline -q
 COPY src ./src
+# Tạo tường minh thư mục static đích để tránh Docker hiểu lầm và ghi đè các folder đồng cấp
+RUN mkdir -p src/main/resources/static
 COPY --from=frontend-build /app/frontend/dist ./src/main/resources/static/
 RUN mvn package -DskipTests -q
 

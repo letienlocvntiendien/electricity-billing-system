@@ -13,7 +13,13 @@ services:
     environment:
       # Spring profiles
       SPRING_PROFILES_ACTIVE: "${SPRING_PROFILES_ACTIVE}"
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+
+      # Flyway
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_LOCATIONS: "classpath:db/migration"
+      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      SPRING_FLYWAY_BASELINE_VERSION: "13"
 
       # Database connection (Đọc động hoàn toàn từ các biến mới trong file .env)
       DB_HOST: "${DB_HOST}"
