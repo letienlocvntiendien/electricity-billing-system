@@ -19,9 +19,14 @@ client.interceptors.response.use(
   (error) => {
     const isAuthEndpoint = error.config?.url?.includes('/auth/')
     if (error.response?.status === 401 && !isAuthEndpoint) {
+      // Clear `user` too — otherwise the cached user keeps isAuthenticated=true
+      // after the redirect and bounces /login back to /, looping forever.
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      localStorage.removeItem('user')
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
